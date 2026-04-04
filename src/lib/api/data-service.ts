@@ -135,7 +135,7 @@ export async function getOKRsByEmpresa(empresaId: string) {
   const supabase = createClient()
   const { data, error } = await supabase
     .from('OKR')
-    .select('*, KeyResult(*)')
+    .select('*, responsavel:Usuario!responsavelId(id, nome), KeyResult(*, responsavel:Usuario!responsavelId(id, nome))')
     .eq('empresaId', empresaId)
     .order('createdAt', { ascending: false })
   if (error) throw error

@@ -32,17 +32,9 @@ function mapOKRFromDB(d: any): OKR {
     prazoInicio: d.prazoInicio ? new Date(d.prazoInicio).toLocaleDateString('pt-BR') : '',
     prazoFim: d.prazoFim ? new Date(d.prazoFim).toLocaleDateString('pt-BR') : '',
     responsavelId: d.responsavelId ?? '',
-    responsavelNome: d.responsavelNome ?? d.responsavelId ?? '',
-    keyResults: (d.KeyResult ?? []).map((kr: {
-      id: string
-      descricao: string
-      metaInicial: number
-      metaAlvo: number
-      valorAtual: number
-      unidade: string
-      responsavelId: string
-      responsavelNome?: string
-    }) => ({
+    responsavelNome: d.responsavel?.nome ?? d.responsavelNome ?? '',
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    keyResults: (d.KeyResult ?? []).map((kr: any) => ({
       id: kr.id,
       descricao: kr.descricao,
       metaInicial: kr.metaInicial ?? 0,
@@ -50,7 +42,7 @@ function mapOKRFromDB(d: any): OKR {
       valorAtual: kr.valorAtual ?? 0,
       unidade: kr.unidade ?? '%',
       responsavelId: kr.responsavelId ?? '',
-      responsavelNome: kr.responsavelNome ?? kr.responsavelId ?? '',
+      responsavelNome: kr.responsavel?.nome ?? '',
     })),
   }
 }
