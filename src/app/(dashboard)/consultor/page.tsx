@@ -64,6 +64,7 @@ import { useClienteContext, ClienteInfo } from "@/hooks/useClienteContext"
 import { createEmpresa, deleteEmpresa, getProjecaoByEmpresa, getCanvasByEmpresa, getOKRsByEmpresa, getReunioesByEmpresa } from "@/lib/api/data-service"
 import { cn } from "@/lib/utils"
 import { gerarResultadoProfecia, calcularKPIs, formatarMoeda, MESES } from "@/lib/calculations/financeiro"
+import { gerarProjecaoCenarios, getFaturamentoCenario } from "@/lib/calculations/cenarios"
 import type { ProjecaoFinanceiraCompleta, BlocoCanvas, CanvasCard as CanvasCardType } from "@/types"
 import type { OKR, KeyResult } from "@/components/planejamento/OKRCard"
 
@@ -368,7 +369,16 @@ function MiniProjecaoPreview({ clientId, clientName }: { clientId: string; clien
   let resultado
   let kpis
   try {
-    const faturamentoMensal = dados.premissasVendas?.historico?.map((h) => h.valor) ?? new Array(12).fill(0)
+    // Generate 12-month projection from historical data (same logic as the full page)
+    const anoProjecao = (dados.anoBase ?? new Date().getFullYear())
+    const projecoes = gerarProjecaoCenarios({
+      historico: dados.premissasVendas?.historico ?? [],
+      anoProjecao,
+      taxaCrescimentoBase: dados.premissasVendas?.taxaCrescimentoBase ?? 0,
+      cenarios: dados.premissasVendas?.cenarios ?? { pessimista: -14, realista: 0, otimista: 16, agressivo: 30, ativo: 'realista' },
+    })
+    const faturamentoMensal = getFaturamentoCenario(projecoes, dados.premissasVendas?.cenarios?.ativo ?? 'realista')
+
     resultado = gerarResultadoProfecia({
       projecao: dados,
       faturamentoMensal,

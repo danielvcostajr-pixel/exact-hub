@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, Trash2, Target } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Plus, Trash2, Target, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import { createClient } from '@/lib/supabase/client'
 
 export interface KeyResultForm {
   id: string
@@ -47,13 +48,10 @@ interface FormOKRProps {
   initialData?: Partial<OKRFormData>
 }
 
-const RESPONSAVEIS = [
-  { id: 'usr-1', nome: 'Ana Beatriz Costa' },
-  { id: 'usr-2', nome: 'Carlos Eduardo Lima' },
-  { id: 'usr-3', nome: 'Fernanda Oliveira' },
-  { id: 'usr-4', nome: 'Rodrigo Mendes' },
-  { id: 'usr-5', nome: 'Patricia Sousa' },
-]
+interface UserOption {
+  id: string
+  nome: string
+}
 
 const UNIDADES = [
   '%', 'R$', 'un', 'dias', 'clientes', 'leads', 'contratos', 'NPS', 'h', 'pts',
@@ -83,6 +81,51 @@ export function FormOKR({ open, onClose, onSave, initialData }: FormOKRProps) {
     responsavelId: initialData?.responsavelId ?? '',
     keyResults: initialData?.keyResults ?? [krVazio()],
   })
+  const [usuarios, setUsuarios] = useState<UserOption[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(true)
+
+  // Load real users from Supabase
+  useEffect(() => {
+    if (!open) return
+    async function loadUsers() {
+      setLoadingUsers(true)
+      try {
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('Usuario')
+          .select('id, nome')
+          .order('nome')
+        if (data) setUsuarios(data)
+      } catch (err) {
+        console.error('Erro ao carregar usuarios:', err)
+      } finally {
+        setLoadingUsers(false)
+      }
+    }
+    loadUsers()
+  }, [open])
+
+  // Auto-select first user when users load and no responsavel selected
+  useEffect(() => {
+    if (usuarios.length > 0 && !form.responsavelId) {
+      setForm((prev) => ({ ...prev, responsavelId: usuarios[0].id }))
+    }
+  }, [usuarios, form.responsavelId])
+
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (open) {
+      setForm({
+        objetivo: initialData?.objetivo ?? '',
+        descricao: initialData?.descricao ?? '',
+        prazoInicio: initialData?.prazoInicio ?? '',
+        prazoFim: initialData?.prazoFim ?? '',
+        responsavelId: initialData?.responsavelId ?? '',
+        keyResults: initialData?.keyResults ?? [krVazio()],
+      })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   function handleField(field: keyof OKRFormData, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -112,8 +155,15 @@ export function FormOKR({ open, onClose, onSave, initialData }: FormOKRProps) {
   }
 
   function handleSubmit() {
-    onSave(form)
-    onClose()
+    // Auto-fill KR responsavelId with OKR responsavelId if empty
+    const finalForm = {
+      ...form,
+      keyResults: form.keyResults.map((kr) => ({
+        ...kr,
+        responsavelId: kr.responsavelId || form.responsavelId,
+      })),
+    }
+    onSave(finalForm)
   }
 
   const isValid =
@@ -187,21 +237,28 @@ export function FormOKR({ open, onClose, onSave, initialData }: FormOKRProps) {
               <Label className="text-foreground text-sm font-medium">
                 Responsavel <span className="text-red-500">*</span>
               </Label>
-              <Select
-                value={form.responsavelId}
-                onValueChange={(v) => handleField('responsavelId', v)}
-              >
-                <SelectTrigger className="bg-background border-border text-foreground">
-                  <SelectValue placeholder="Selecionar..." />
-                </SelectTrigger>
-                <SelectContent className="bg-card border-border">
-                  {RESPONSAVEIS.map((r) => (
-                    <SelectItem key={r.id} value={r.id} className="text-foreground">
-                      {r.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {loadingUsers ? (
+                <div className="h-10 flex items-center gap-2 px-3 border border-border rounded-md bg-background">
+                  <Loader2 size={14} className="animate-spin text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Carregando...</span>
+                </div>
+              ) : (
+                <Select
+                  value={form.responsavelId}
+                  onValueChange={(v) => handleField('responsavelId', v)}
+                >
+                  <SelectTrigger className="bg-background border-border text-foreground">
+                    <SelectValue placeholder="Selecionar..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-border">
+                    {usuarios.map((r) => (
+                      <SelectItem key={r.id} value={r.id} className="text-foreground">
+                        {r.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
 
@@ -301,14 +358,14 @@ export function FormOKR({ open, onClose, onSave, initialData }: FormOKRProps) {
                   <div className="flex flex-col gap-1.5">
                     <Label className="text-foreground text-xs">Responsavel</Label>
                     <Select
-                      value={kr.responsavelId}
+                      value={kr.responsavelId || form.responsavelId}
                       onValueChange={(v) => handleKRField(kr.id, 'responsavelId', v)}
                     >
                       <SelectTrigger className="bg-card border-border text-foreground text-sm">
                         <SelectValue placeholder="..." />
                       </SelectTrigger>
                       <SelectContent className="bg-card border-border">
-                        {RESPONSAVEIS.map((r) => (
+                        {usuarios.map((r) => (
                           <SelectItem key={r.id} value={r.id} className="text-foreground text-xs">
                             {r.nome.split(' ')[0]}
                           </SelectItem>
