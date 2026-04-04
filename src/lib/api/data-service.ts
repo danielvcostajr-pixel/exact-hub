@@ -90,10 +90,6 @@ export async function saveCanvas(empresaId: string, canvasData: Record<string, u
 }
 
 // ── Projecao Financeira ───────────────────────────────────────────────────────
-// Schema has: id, empresaId, nome, anoBase, crescimentoOtimista/Realista/Pessimista,
-// metaAnual, observacoes, createdAt, updatedAt
-// We store the full PROFECIA data as JSON in the 'observacoes' field.
-
 export async function getProjecaoByEmpresa(empresaId: string) {
   const supabase = createClient()
   const { data, error } = await supabase
@@ -104,15 +100,6 @@ export async function getProjecaoByEmpresa(empresaId: string) {
     .limit(1)
     .maybeSingle()
   if (error) throw error
-
-  // Parse the JSON stored in observacoes into a 'dados' property
-  if (data && data.observacoes) {
-    try {
-      data.dados = JSON.parse(data.observacoes)
-    } catch {
-      data.dados = null
-    }
-  }
   return data
 }
 
@@ -120,14 +107,12 @@ export async function saveProjecao(empresaId: string, projecaoData: Record<strin
   const supabase = createClient()
   const existing = await getProjecaoByEmpresa(empresaId)
 
-  // Serialize the full PROFECIA data into the observacoes field
-  const serialized = JSON.stringify(projecaoData)
   const anoBase = (projecaoData as { anoBase?: number }).anoBase ?? new Date().getFullYear()
 
   if (existing) {
     const { data, error } = await supabase
       .from('ProjecaoFinanceira')
-      .update({ observacoes: serialized, anoBase, updatedAt: now() })
+      .update({ dados: projecaoData, anoBase })
       .eq('id', existing.id)
       .select()
       .single()
@@ -136,14 +121,7 @@ export async function saveProjecao(empresaId: string, projecaoData: Record<strin
   } else {
     const { data, error } = await supabase
       .from('ProjecaoFinanceira')
-      .insert({
-        id: uuid(),
-        empresaId,
-        nome: 'Projecao Principal',
-        anoBase,
-        observacoes: serialized,
-        updatedAt: now(),
-      })
+      .insert({ empresaId, nome: 'Projecao Principal', anoBase, dados: projecaoData })
       .select()
       .single()
     if (error) throw error
