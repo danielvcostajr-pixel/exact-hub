@@ -2,30 +2,73 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Plus, Target, ArrowLeft } from 'lucide-react'
+import { Plus, Target, ArrowLeft, Loader2 } from 'lucide-react'
 import { useClienteContext } from '@/hooks/useClienteContext'
-import { getOKRsByEmpresa } from '@/lib/api/data-service'
+import { getOKRsByEmpresa, createOKR, createKeyResult, updateKeyResult, getCurrentUserId } from '@/lib/api/data-service'
 import { Button } from '@/components/ui/button'
 import { OKRCard, type OKR, type OKRStatus } from '@/components/planejamento/OKRCard'
 import { FormOKR, type OKRFormData } from '@/components/planejamento/FormOKR'
 
-function gerarId() {
-  return Math.random().toString(36).substring(2, 10)
+const STATUS_ORDER: OKRStatus[] = ['Ativo', 'Rascunho', 'Concluido', 'Cancelado']
+
+// Map Supabase status enum to display status
+function mapStatus(status: string): OKRStatus {
+  const map: Record<string, OKRStatus> = {
+    RASCUNHO: 'Rascunho',
+    ATIVO: 'Ativo',
+    CONCLUIDO: 'Concluido',
+    CANCELADO: 'Cancelado',
+  }
+  return map[status] ?? 'Rascunho'
 }
 
-const STATUS_ORDER: OKRStatus[] = ['Ativo', 'Rascunho', 'Concluido', 'Cancelado']
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapOKRFromDB(d: any): OKR {
+  return {
+    id: d.id,
+    objetivo: d.objetivo,
+    descricao: d.descricao ?? '',
+    status: mapStatus(d.status),
+    prazoInicio: d.prazoInicio ? new Date(d.prazoInicio).toLocaleDateString('pt-BR') : '',
+    prazoFim: d.prazoFim ? new Date(d.prazoFim).toLocaleDateString('pt-BR') : '',
+    responsavelId: d.responsavelId ?? '',
+    responsavelNome: d.responsavelNome ?? d.responsavelId ?? '',
+    keyResults: (d.KeyResult ?? []).map((kr: {
+      id: string
+      descricao: string
+      metaInicial: number
+      metaAlvo: number
+      valorAtual: number
+      unidade: string
+      responsavelId: string
+      responsavelNome?: string
+    }) => ({
+      id: kr.id,
+      descricao: kr.descricao,
+      metaInicial: kr.metaInicial ?? 0,
+      metaAlvo: kr.metaAlvo ?? 100,
+      valorAtual: kr.valorAtual ?? 0,
+      unidade: kr.unidade ?? '%',
+      responsavelId: kr.responsavelId ?? '',
+      responsavelNome: kr.responsavelNome ?? kr.responsavelId ?? '',
+    })),
+  }
+}
 
 export default function OKRsPage() {
   const { clienteAtivo, isFiltered } = useClienteContext()
   const [okrs, setOkrs] = useState<OKR[]>([])
   const [formOpen, setFormOpen] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (clienteAtivo) {
       setLoading(true)
       getOKRsByEmpresa(clienteAtivo.id)
-        .then((data) => setOkrs(data as unknown as OKR[]))
+        .then((data) => {
+          if (data) setOkrs(data.map(mapOKRFromDB))
+        })
         .catch(() => setOkrs([]))
         .finally(() => setLoading(false))
     }
@@ -53,7 +96,8 @@ export default function OKRsPage() {
         )
       : 0
 
-  function handleUpdateKR(okrId: string, krId: string, novoValor: number) {
+  async function handleUpdateKR(okrId: string, krId: string, novoValor: number) {
+    // Update locally first
     setOkrs((prev) =>
       prev.map((okr) =>
         okr.id === okrId
@@ -66,32 +110,57 @@ export default function OKRsPage() {
           : okr
       )
     )
+    // Persist to Supabase
+    try {
+      await updateKeyResult(krId, { valorAtual: novoValor })
+    } catch (err) {
+      console.error('Erro ao atualizar KR:', err)
+    }
   }
 
-  function handleSaveOKR(data: OKRFormData) {
-    const RESPONSAVEIS: Record<string, string> = {
-      'usr-1': 'Ana Beatriz Costa',
-      'usr-2': 'Carlos Eduardo Lima',
-      'usr-3': 'Fernanda Oliveira',
-      'usr-4': 'Rodrigo Mendes',
-      'usr-5': 'Patricia Sousa',
+  async function handleSaveOKR(data: OKRFormData) {
+    if (!clienteAtivo) return
+    setSaving(true)
+    try {
+      // Get current user id for responsavelId
+      const userId = await getCurrentUserId()
+      const responsavelId = data.responsavelId || userId || 'system'
+
+      const created = await createOKR({
+        empresaId: clienteAtivo.id,
+        objetivo: data.objetivo,
+        descricao: data.descricao,
+        prazoInicio: data.prazoInicio,
+        prazoFim: data.prazoFim,
+        responsavelId,
+        status: 'ATIVO',
+      })
+
+      // Create Key Results
+      if (data.keyResults && data.keyResults.length > 0) {
+        for (const kr of data.keyResults) {
+          await createKeyResult({
+            okrId: created.id,
+            descricao: kr.descricao,
+            metaInicial: kr.metaInicial,
+            metaAlvo: kr.metaAlvo,
+            valorAtual: kr.metaInicial,
+            unidade: kr.unidade,
+            responsavelId: kr.responsavelId || responsavelId,
+          })
+        }
+      }
+
+      // Reload from DB to get complete data
+      const fresh = await getOKRsByEmpresa(clienteAtivo.id)
+      if (fresh) setOkrs(fresh.map(mapOKRFromDB))
+      setFormOpen(false)
+    } catch (err) {
+      console.error('Erro ao criar OKR:', err)
+      alert('Erro ao salvar OKR. Verifique os dados e tente novamente.')
+    } finally {
+      setSaving(false)
     }
-    const novoOKR: OKR = {
-      id: gerarId(),
-      objetivo: data.objetivo,
-      descricao: data.descricao,
-      status: 'Rascunho',
-      prazoInicio: data.prazoInicio,
-      prazoFim: data.prazoFim,
-      responsavelId: data.responsavelId,
-      responsavelNome: RESPONSAVEIS[data.responsavelId] ?? 'Responsavel',
-      keyResults: data.keyResults.map((kr) => ({
-        ...kr,
-        valorAtual: kr.metaInicial,
-        responsavelNome: RESPONSAVEIS[kr.responsavelId] ?? 'Responsavel',
-      })),
-    }
-    setOkrs((prev) => [novoOKR, ...prev])
   }
 
   const sortedOkrs = [...okrs].sort(
@@ -108,8 +177,9 @@ export default function OKRsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <Loader2 className="size-6 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Carregando OKRs...</p>
       </div>
     )
   }
@@ -139,9 +209,10 @@ export default function OKRsPage() {
         </div>
         <Button
           onClick={() => setFormOpen(true)}
+          disabled={saving}
           className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white gap-2 shrink-0"
         >
-          <Plus size={16} />
+          {saving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
           Novo OKR
         </Button>
       </div>

@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { useClienteContext } from '@/hooks/useClienteContext'
+import { getProjecaoByEmpresa, saveProjecao } from '@/lib/api/data-service'
 import type {
   ProjecaoFinanceiraCompleta,
   ResultadoProfecia,
@@ -41,6 +42,9 @@ import {
   PlayCircle,
   ChevronRight,
   ArrowLeft,
+  Save,
+  Loader2,
+  CheckCircle2,
 } from 'lucide-react'
 
 // ============================================================
@@ -149,6 +153,49 @@ export default function ProjecaoFinanceiraPage() {
   const [activeResultTab, setActiveResultTab] = useState<ResultTab>('profecia')
   const [resultados, setResultados] = useState<ResultadosCalculados | null>(null)
   const [calculando, setCalculando] = useState(false)
+  const [salvando, setSalvando] = useState(false)
+  const [carregando, setCarregando] = useState(false)
+  const [savedAt, setSavedAt] = useState<string | null>(null)
+
+  // ── Carregar dados salvos do Supabase ──────────────────────
+  useEffect(() => {
+    if (!clienteAtivo) return
+    let cancelled = false
+    async function load() {
+      setCarregando(true)
+      try {
+        const data = await getProjecaoByEmpresa(clienteAtivo!.id)
+        if (!cancelled && data?.dados) {
+          const loaded = data.dados as ProjecaoFinanceiraCompleta
+          setDados({ ...ESTADO_INICIAL, ...loaded, empresaId: clienteAtivo!.id })
+          if (loaded.anoBase) setAnoBase(loaded.anoBase - 1)
+        }
+      } catch (err) {
+        console.error('Erro ao carregar projecao:', err)
+      } finally {
+        if (!cancelled) setCarregando(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [clienteAtivo])
+
+  // ── Salvar dados no Supabase ───────────────────────────────
+  async function handleSave() {
+    if (!clienteAtivo) return
+    setSalvando(true)
+    setSavedAt(null)
+    try {
+      const toSave = { ...dados, empresaId: clienteAtivo.id, anoBase: anoProjecao }
+      await saveProjecao(clienteAtivo.id, toSave as unknown as Record<string, unknown>)
+      setSavedAt(new Date().toLocaleTimeString('pt-BR'))
+    } catch (err) {
+      console.error('Erro ao salvar projecao:', err)
+      alert('Erro ao salvar. Tente novamente.')
+    } finally {
+      setSalvando(false)
+    }
+  }
 
   // ── Calcular projecao ────────────────────────────────────────
   const calcular = useCallback(() => {
@@ -432,6 +479,15 @@ export default function ProjecaoFinanceiraPage() {
     )
   }
 
+  if (carregando) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3 p-6">
+        <Loader2 className="size-6 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Carregando projecao...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
@@ -484,6 +540,24 @@ export default function ProjecaoFinanceiraPage() {
 
           {/* Spacer */}
           <div className="flex-1" />
+
+          {/* Save status */}
+          {savedAt && (
+            <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-green-500/10 text-green-500 text-[11px] font-medium">
+              <CheckCircle2 size={12} />
+              Salvo as {savedAt}
+            </div>
+          )}
+
+          {/* Save button */}
+          <button
+            onClick={handleSave}
+            disabled={salvando}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-medium text-sm transition-all border border-border bg-card hover:bg-secondary disabled:opacity-60 disabled:cursor-not-allowed text-foreground"
+          >
+            {salvando ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {salvando ? 'Salvando...' : 'Salvar Dados'}
+          </button>
 
           {/* Calcular button */}
           <button
