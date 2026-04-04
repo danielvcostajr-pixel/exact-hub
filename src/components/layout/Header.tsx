@@ -1,6 +1,6 @@
 "use client"
 
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Menu, Search, Bell, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,6 +16,7 @@ import {
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { ClienteSelector } from "@/components/layout/ClienteSelector"
 import { useClienteContext } from "@/hooks/useClienteContext"
+import { createClient } from "@/lib/supabase/client"
 
 interface HeaderProps {
   onMenuClick: () => void
@@ -34,7 +35,14 @@ const pageTitles: Record<string, string> = {
 
 export function Header({ onMenuClick, userName = "Daniel Vieira" }: HeaderProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const { clienteAtivo, isFiltered } = useClienteContext()
+
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push("/login")
+  }
 
   const baseTitle = pageTitles[pathname] ?? "Dashboard"
   const pageTitle =
@@ -119,7 +127,10 @@ export function Header({ onMenuClick, userName = "Daniel Vieira" }: HeaderProps)
           <DropdownMenuItem>Perfil</DropdownMenuItem>
           <DropdownMenuItem>Configuracoes</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="text-red-500 focus:text-red-500">
+          <DropdownMenuItem
+            className="text-red-500 focus:text-red-500 cursor-pointer"
+            onClick={handleSignOut}
+          >
             Sair
           </DropdownMenuItem>
         </DropdownMenuContent>

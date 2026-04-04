@@ -1,23 +1,54 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Zap, Eye, EyeOff, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { createClient } from "@/lib/supabase/client"
 
 export default function LoginPage() {
+  const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setIsLoading(true)
-    console.log("Login attempt:", { email, password })
-    setTimeout(() => setIsLoading(false), 1500)
+    setError(null)
+
+    const supabase = createClient()
+
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (authError) {
+      setError("Email ou senha incorretos. Verifique suas credenciais e tente novamente.")
+      setIsLoading(false)
+      return
+    }
+
+    if (data.user) {
+      // Fetch user profile to determine role
+      const { data: profile } = await supabase
+        .from("usuarios")
+        .select("papel")
+        .eq("id", data.user.id)
+        .single()
+
+      if (profile?.papel === "CLIENTE") {
+        router.push("/cliente")
+      } else {
+        router.push("/consultor")
+      }
+    }
   }
 
   return (
@@ -120,6 +151,13 @@ export default function LoginPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Error message */}
+              {error && (
+                <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2.5">
+                  <p className="text-sm text-red-500">{error}</p>
+                </div>
+              )}
 
               {/* Submit button */}
               <Button
