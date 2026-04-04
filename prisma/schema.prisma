@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -10,4 +5,727 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// ─── Enums existentes ────────────────────────────────────────────────────────
+
+enum Papel {
+  CONSULTOR
+  CLIENTE
+  ADMIN
+}
+
+enum TipoCusto {
+  FIXO
+  VARIAVEL
+}
+
+enum TipoInvestimento {
+  CAPEX
+  OPEX
+}
+
+enum TipoFinanciamento {
+  SAC
+  PRICE
+  BULLET
+}
+
+enum StatusEntrevista {
+  RASCUNHO
+  ATIVA
+  FINALIZADA
+  ANALISADA
+}
+
+// ─── Enums Phase 2 ───────────────────────────────────────────────────────────
+
+enum StatusOKR {
+  RASCUNHO
+  ATIVO
+  CONCLUIDO
+  CANCELADO
+}
+
+enum FrequenciaRotina {
+  DIARIA
+  SEMANAL
+  QUINZENAL
+  MENSAL
+  TRIMESTRAL
+}
+
+enum StatusAcao {
+  NAO_INICIADA
+  EM_ANDAMENTO
+  CONCLUIDA
+  BLOQUEADA
+}
+
+enum PapelRACI {
+  RESPONSIBLE
+  ACCOUNTABLE
+  CONSULTED
+  INFORMED
+}
+
+enum StatusTarefa {
+  BACKLOG
+  A_FAZER
+  EM_PROGRESSO
+  REVISAO
+  CONCLUIDA
+  CANCELADA
+}
+
+enum PrioridadeTarefa {
+  BAIXA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
+enum StatusReuniao {
+  AGENDADA
+  REALIZADA
+  CANCELADA
+}
+
+// ─── Models existentes ────────────────────────────────────────────────────────
+
+model Usuario {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  nome      String
+  papel     Papel    @default(CLIENTE)
+  avatar    String?
+  ativo     Boolean  @default(true)
+  empresaId String?
+  empresa   Empresa? @relation(fields: [empresaId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relações existentes
+  entrevistasCriadas Entrevista[]     @relation("CriadaPor")
+  memoriasGeradas    MemoriaCliente[] @relation("GeradaPor")
+
+  // Relações Phase 2
+  okrs                   OKR[]                   @relation("OKRResponsavel")
+  keyResults             KeyResult[]             @relation("KeyResultResponsavel")
+  rotinas                Rotina[]                @relation("RotinaResponsavel")
+  tarefasResponsavel     Tarefa[]                @relation("TarefaResponsavel")
+  tarefasCriadas         Tarefa[]                @relation("TarefaCriadaPor")
+  comentariosTarefa      ComentarioTarefa[]      @relation("ComentarioAutor")
+  anexosEnviados         AnexoTarefa[]           @relation("AnexoEnviadoPor")
+  conversas              UsuarioConversa[]
+  mensagens              Mensagem[]              @relation("MensagemRemetente")
+  reunioes               UsuarioReuniao[]
+  atasCriadas            AtaReuniao[]            @relation("AtaCriadaPor")
+  relatoriosCriados      RelatorioSemanal[]      @relation("RelatorioCriadoPor")
+  fechamentosCriados     FechamentoMensal[]      @relation("FechamentoCriadoPor")
+  simuladoresCriados     Simulador[]             @relation("SimuladorCriadoPor")
+  simulacoesExecutadas   HistoricoSimulacao[]    @relation("SimulacaoExecutadaPor")
+  execucoesItemControle  ExecucaoItemControle[]  @relation("ExecucaoExecutadaPor")
+  papeisRaci             PapelAcaoRACI[]
+}
+
+model Empresa {
+  id           String   @id @default(uuid())
+  razaoSocial  String
+  nomeFantasia String?
+  cnpj         String?  @unique
+  segmento     String?
+  porte        String?
+  responsavel  String?
+  telefone     String?
+  email        String?
+  cidade       String?
+  estado       String?
+  ativa        Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relações existentes
+  usuarios             Usuario[]
+  projecoesFinanceiras ProjecaoFinanceira[]
+  canvasNegocios       BusinessModelCanvas[]
+  entrevistas          Entrevista[]
+  memorias             MemoriaCliente[]
+
+  // Relações Phase 2
+  okrs               OKR[]
+  rotinas            Rotina[]
+  planosAcao         PlanoAcao[]
+  tarefas            Tarefa[]
+  conversas          Conversa[]
+  reunioes           Reuniao[]
+  relatoriosSemanais RelatorioSemanal[]
+  fechamentosMensais FechamentoMensal[]
+  simuladores        Simulador[]
+}
+
+model ProjecaoFinanceira {
+  id                    String   @id @default(uuid())
+  empresaId             String
+  empresa               Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nome                  String   @default("Projecao Principal")
+  anoBase               Int
+  crescimentoOtimista   Float    @default(20)
+  crescimentoRealista   Float    @default(0)
+  crescimentoPessimista Float    @default(-20)
+  metaAnual             Float?
+  observacoes           String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  custos               Custo[]
+  investimentos        Investimento[]
+  financiamentos       Financiamento[]
+  historicoFaturamento HistoricoFaturamento[]
+  projecaoFaturamento  ProjecaoFaturamento[]
+  prazosMedios         PrazoMedio[]
+}
+
+model Custo {
+  id          String             @id @default(uuid())
+  projecaoId  String
+  projecao    ProjecaoFinanceira @relation(fields: [projecaoId], references: [id], onDelete: Cascade)
+  nome        String
+  tipo        TipoCusto
+  valor       Float
+  recorrencia String             @default("mensal")
+  categoria   String?
+  createdAt   DateTime           @default(now())
+}
+
+model Investimento {
+  id         String             @id @default(uuid())
+  projecaoId String
+  projecao   ProjecaoFinanceira @relation(fields: [projecaoId], references: [id], onDelete: Cascade)
+  nome       String
+  valor      Float
+  data       DateTime?
+  tipo       TipoInvestimento
+  descricao  String?
+  createdAt  DateTime           @default(now())
+}
+
+model Financiamento {
+  id         String             @id @default(uuid())
+  projecaoId String
+  projecao   ProjecaoFinanceira @relation(fields: [projecaoId], references: [id], onDelete: Cascade)
+  nome       String
+  valor      Float
+  taxa       Float
+  prazo      Int
+  carencia   Int                @default(0)
+  tipo       TipoFinanciamento
+  dataInicio DateTime?
+  createdAt  DateTime           @default(now())
+}
+
+model HistoricoFaturamento {
+  id         String             @id @default(uuid())
+  projecaoId String
+  projecao   ProjecaoFinanceira @relation(fields: [projecaoId], references: [id], onDelete: Cascade)
+  mes        Int
+  ano        Int
+  valor      Float
+  createdAt  DateTime           @default(now())
+
+  @@unique([projecaoId, mes, ano])
+}
+
+model ProjecaoFaturamento {
+  id              String             @id @default(uuid())
+  projecaoId      String
+  projecao        ProjecaoFinanceira @relation(fields: [projecaoId], references: [id], onDelete: Cascade)
+  mes             Int
+  ano             Int
+  valorBase       Float
+  valorOtimista   Float
+  valorPessimista Float
+  createdAt       DateTime           @default(now())
+
+  @@unique([projecaoId, mes, ano])
+}
+
+model PrazoMedio {
+  id              String             @id @default(uuid())
+  projecaoId      String
+  projecao        ProjecaoFinanceira @relation(fields: [projecaoId], references: [id], onDelete: Cascade)
+  tipo            String
+  duplicatas      Float
+  valorReferencia Float
+  diasCalculado   Float
+  createdAt       DateTime           @default(now())
+}
+
+model BusinessModelCanvas {
+  id        String   @id @default(uuid())
+  empresaId String
+  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  versao    Int      @default(1)
+  blocos    Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Entrevista {
+  id          String           @id @default(uuid())
+  empresaId   String
+  empresa     Empresa          @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  titulo      String
+  descricao   String?
+  status      StatusEntrevista @default(RASCUNHO)
+  perguntas   Json             @default("[]")
+  analise     Json?
+  criadoPorId String
+  criadoPor   Usuario          @relation("CriadaPor", fields: [criadoPorId], references: [id])
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  respostas RespostaEntrevista[]
+}
+
+model RespostaEntrevista {
+  id           String     @id @default(uuid())
+  entrevistaId String
+  entrevista   Entrevista @relation(fields: [entrevistaId], references: [id], onDelete: Cascade)
+  respondente  String
+  cargo        String?
+  area         String?
+  respostas    Json
+  createdAt    DateTime   @default(now())
+}
+
+model MemoriaCliente {
+  id          String   @id @default(uuid())
+  empresaId   String
+  empresa     Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  conteudo    String   @db.Text
+  versao      Int      @default(1)
+  geradoPorId String
+  geradoPor   Usuario  @relation("GeradaPor", fields: [geradoPorId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── Models Phase 2 ──────────────────────────────────────────────────────────
+
+model OKR {
+  id            String     @id @default(uuid())
+  empresaId     String
+  empresa       Empresa    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  objetivo      String
+  descricao     String?
+  prazoInicio   DateTime
+  prazoFim      DateTime
+  status        StatusOKR  @default(RASCUNHO)
+  responsavelId String
+  responsavel   Usuario    @relation("OKRResponsavel", fields: [responsavelId], references: [id])
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  keyResults KeyResult[]
+  tarefas    Tarefa[]
+  planosAcao PlanoAcao[]
+
+  @@index([empresaId])
+  @@index([responsavelId])
+  @@index([status])
+}
+
+model KeyResult {
+  id            String   @id @default(uuid())
+  okrId         String
+  okr           OKR      @relation(fields: [okrId], references: [id], onDelete: Cascade)
+  descricao     String
+  metaInicial   Float
+  metaAlvo      Float
+  valorAtual    Float    @default(0)
+  unidade       String?
+  progressoPerc Float    @default(0)
+  responsavelId String
+  responsavel   Usuario  @relation("KeyResultResponsavel", fields: [responsavelId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([okrId])
+  @@index([responsavelId])
+}
+
+model Rotina {
+  id            String           @id @default(uuid())
+  empresaId     String
+  empresa       Empresa          @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nome          String
+  descricao     String?
+  frequencia    FrequenciaRotina
+  categoria     String?
+  diaSemana     Int?
+  diaMes        Int?
+  hora          String?
+  responsavelId String
+  responsavel   Usuario          @relation("RotinaResponsavel", fields: [responsavelId], references: [id])
+  ativo         Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  itensControle ItemControle[]
+
+  @@index([empresaId])
+  @@index([responsavelId])
+}
+
+model ItemControle {
+  id         String   @id @default(uuid())
+  rotinaId   String
+  rotina     Rotina   @relation(fields: [rotinaId], references: [id], onDelete: Cascade)
+  descricao  String
+  ordem      Int      @default(0)
+  obrigatorio Boolean @default(true)
+  createdAt  DateTime @default(now())
+
+  execucoes ExecucaoItemControle[]
+
+  @@index([rotinaId])
+}
+
+model ExecucaoItemControle {
+  id             String       @id @default(uuid())
+  itemControleId String
+  itemControle   ItemControle @relation(fields: [itemControleId], references: [id], onDelete: Cascade)
+  dataExecucao   DateTime
+  concluido      Boolean      @default(false)
+  observacao     String?
+  executadoPorId String
+  executadoPor   Usuario      @relation("ExecucaoExecutadaPor", fields: [executadoPorId], references: [id])
+  createdAt      DateTime     @default(now())
+
+  @@index([itemControleId])
+  @@index([executadoPorId])
+  @@index([dataExecucao])
+}
+
+model PlanoAcao {
+  id        String   @id @default(uuid())
+  empresaId String
+  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  titulo    String
+  descricao String?
+  okrId     String?
+  okr       OKR?     @relation(fields: [okrId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  acoes Acao[]
+
+  @@index([empresaId])
+  @@index([okrId])
+}
+
+model Acao {
+  id        String     @id @default(uuid())
+  planoId   String
+  plano     PlanoAcao  @relation(fields: [planoId], references: [id], onDelete: Cascade)
+  descricao String
+  prazo     DateTime?
+  status    StatusAcao @default(NAO_INICIADA)
+  resultado String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  papeisRaci PapelAcaoRACI[]
+  tarefas    Tarefa[]
+
+  @@index([planoId])
+  @@index([status])
+}
+
+model PapelAcaoRACI {
+  id        String    @id @default(uuid())
+  acaoId    String
+  acao      Acao      @relation(fields: [acaoId], references: [id], onDelete: Cascade)
+  usuarioId String
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id])
+  papel     PapelRACI
+  createdAt DateTime  @default(now())
+
+  @@unique([acaoId, usuarioId, papel])
+  @@index([acaoId])
+  @@index([usuarioId])
+}
+
+model Tarefa {
+  id               String           @id @default(uuid())
+  empresaId        String
+  empresa          Empresa          @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  titulo           String
+  descricao        String?
+  status           StatusTarefa     @default(BACKLOG)
+  prioridade       PrioridadeTarefa @default(MEDIA)
+  dataInicio       DateTime?
+  prazo            DateTime?
+  dataConclusao    DateTime?
+  estimativaHoras  Float?
+  horasTrabalhadas Float?           @default(0)
+  responsavelId    String?
+  responsavel      Usuario?         @relation("TarefaResponsavel", fields: [responsavelId], references: [id])
+  criadoPorId      String
+  criadoPor        Usuario          @relation("TarefaCriadaPor", fields: [criadoPorId], references: [id])
+  okrId            String?
+  okr              OKR?             @relation(fields: [okrId], references: [id])
+  acaoId           String?
+  acao             Acao?            @relation(fields: [acaoId], references: [id])
+  clickupTaskId    String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  comentarios ComentarioTarefa[]
+  anexos      AnexoTarefa[]
+  checklist   ChecklistItemTarefa[]
+
+  @@index([empresaId])
+  @@index([responsavelId])
+  @@index([criadoPorId])
+  @@index([status])
+  @@index([prioridade])
+  @@index([okrId])
+  @@index([acaoId])
+}
+
+model ComentarioTarefa {
+  id        String   @id @default(uuid())
+  tarefaId  String
+  tarefa    Tarefa   @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
+  conteudo  String   @db.Text
+  autorId   String
+  autor     Usuario  @relation("ComentarioAutor", fields: [autorId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tarefaId])
+  @@index([autorId])
+}
+
+model AnexoTarefa {
+  id           String   @id @default(uuid())
+  tarefaId     String
+  tarefa       Tarefa   @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
+  nomeArquivo  String
+  url          String
+  tamanhoBytes Int?
+  tipoMime     String?
+  enviadoPorId String
+  enviadoPor   Usuario  @relation("AnexoEnviadoPor", fields: [enviadoPorId], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([tarefaId])
+  @@index([enviadoPorId])
+}
+
+model ChecklistItemTarefa {
+  id        String   @id @default(uuid())
+  tarefaId  String
+  tarefa    Tarefa   @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
+  descricao String
+  concluido Boolean  @default(false)
+  ordem     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([tarefaId])
+}
+
+model Conversa {
+  id        String   @id @default(uuid())
+  empresaId String
+  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  titulo    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  participantes UsuarioConversa[]
+  mensagens     Mensagem[]
+
+  @@index([empresaId])
+}
+
+model UsuarioConversa {
+  id           String    @id @default(uuid())
+  conversaId   String
+  conversa     Conversa  @relation(fields: [conversaId], references: [id], onDelete: Cascade)
+  usuarioId    String
+  usuario      Usuario   @relation(fields: [usuarioId], references: [id])
+  ultimaLeitura DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@unique([conversaId, usuarioId])
+  @@index([conversaId])
+  @@index([usuarioId])
+}
+
+model Mensagem {
+  id          String   @id @default(uuid())
+  conversaId  String
+  conversa    Conversa @relation(fields: [conversaId], references: [id], onDelete: Cascade)
+  conteudo    String   @db.Text
+  remetenteId String
+  remetente   Usuario  @relation("MensagemRemetente", fields: [remetenteId], references: [id])
+  anexosUrls  Json?
+  createdAt   DateTime @default(now())
+
+  @@index([conversaId])
+  @@index([remetenteId])
+}
+
+model Reuniao {
+  id              String        @id @default(uuid())
+  empresaId       String
+  empresa         Empresa       @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  titulo          String
+  descricao       String?
+  dataHora        DateTime
+  duracaoMinutos  Int?
+  local           String?
+  linkReuniao     String?
+  status          StatusReuniao @default(AGENDADA)
+  gcalEventId     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  participantes UsuarioReuniao[]
+  ata           AtaReuniao?
+
+  @@index([empresaId])
+  @@index([status])
+  @@index([dataHora])
+}
+
+model UsuarioReuniao {
+  id         String   @id @default(uuid())
+  reuniaoId  String
+  reuniao    Reuniao  @relation(fields: [reuniaoId], references: [id], onDelete: Cascade)
+  usuarioId  String
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id])
+  confirmou  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@unique([reuniaoId, usuarioId])
+  @@index([reuniaoId])
+  @@index([usuarioId])
+}
+
+model AtaReuniao {
+  id             String   @id @default(uuid())
+  reuniaoId      String   @unique
+  reuniao        Reuniao  @relation(fields: [reuniaoId], references: [id], onDelete: Cascade)
+  pauta          String   @db.Text
+  discussao      String   @db.Text
+  decisoes       Json
+  proximosPassos Json
+  anexosUrls     Json?
+  criadoPorId    String
+  criadoPor      Usuario  @relation("AtaCriadaPor", fields: [criadoPorId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([criadoPorId])
+}
+
+model RelatorioSemanal {
+  id                  String    @id @default(uuid())
+  empresaId           String
+  empresa             Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  semanaInicio        DateTime
+  semanaFim           DateTime
+  resumoExecutivo     String    @db.Text
+  tarefasConcluidas   Json
+  tarefasEmAndamento  Json
+  problemas           String?   @db.Text
+  proximaSemana       String?   @db.Text
+  kpis                Json?
+  criadoPorId         String
+  criadoPor           Usuario   @relation("RelatorioCriadoPor", fields: [criadoPorId], references: [id])
+  enviadoEm           DateTime?
+  destinatarios       Json?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([empresaId])
+  @@index([criadoPorId])
+  @@index([semanaInicio])
+}
+
+model FechamentoMensal {
+  id               String   @id @default(uuid())
+  empresaId        String
+  empresa          Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  mes              Int
+  ano              Int
+  faturamentoReal  Float
+  faturamentoMeta  Float
+  custosReal       Float
+  custosMeta       Float
+  margemLiquida    Float
+  okrsAvaliados    Json
+  resumo           String   @db.Text
+  destaques        String?  @db.Text
+  desafios         String?  @db.Text
+  focoProximoMes   String?  @db.Text
+  criadoPorId      String
+  criadoPor        Usuario  @relation("FechamentoCriadoPor", fields: [criadoPorId], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([empresaId, mes, ano])
+  @@index([empresaId])
+  @@index([criadoPorId])
+}
+
+// ─── FASE 3: SIMULADORES ──────────────────────────────────────────────────────
+
+enum TipoSimulador {
+  PONTO_EQUILIBRIO
+  PRECIFICACAO
+  CENARIOS_FINANCEIROS
+  ROI_INVESTIMENTO
+}
+
+model Simulador {
+  id              String          @id @default(uuid())
+  empresaId       String
+  empresa         Empresa         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  tipo            TipoSimulador
+  nome            String
+  descricao       String?         @db.Text
+  inputs          Json
+  outputs         Json?
+  ativoParaCliente Boolean        @default(false)
+  criadoPorId     String
+  criadoPor       Usuario         @relation("SimuladorCriadoPor", fields: [criadoPorId], references: [id])
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  historico       HistoricoSimulacao[]
+
+  @@index([empresaId])
+  @@index([tipo])
+  @@index([criadoPorId])
+}
+
+model HistoricoSimulacao {
+  id              String     @id @default(uuid())
+  simuladorId     String
+  simulador       Simulador  @relation(fields: [simuladorId], references: [id], onDelete: Cascade)
+  inputsSnapshot  Json
+  outputsSnapshot Json
+  executadoPorId  String
+  executadoPor    Usuario    @relation("SimulacaoExecutadaPor", fields: [executadoPorId], references: [id])
+  observacoes     String?    @db.Text
+  createdAt       DateTime   @default(now())
+
+  @@index([simuladorId])
+  @@index([createdAt])
+  @@index([executadoPorId])
 }

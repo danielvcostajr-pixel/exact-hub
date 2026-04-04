@@ -1,0 +1,378 @@
+"use client"
+
+import { useState, useMemo } from "react"
+import {
+  List,
+  LayoutGrid,
+  Calendar,
+  GanttChartSquare,
+  Plus,
+  Search,
+  SlidersHorizontal,
+  X,
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { cn } from "@/lib/utils"
+import TarefaListView from "@/components/tarefas/TarefaListView"
+import TarefaKanbanView from "@/components/tarefas/TarefaKanbanView"
+import TarefaCalendarioView from "@/components/tarefas/TarefaCalendarioView"
+import TarefaGanttView from "@/components/tarefas/TarefaGanttView"
+import TarefaDetailPanel from "@/components/tarefas/TarefaDetailPanel"
+import FormTarefa from "@/components/tarefas/FormTarefa"
+import {
+  Tarefa,
+  StatusTarefa,
+  MOCK_TAREFAS,
+  STATUS_CONFIG,
+  PRIORIDADE_CONFIG,
+} from "@/components/tarefas/tarefas-types"
+
+type ViewType = "lista" | "kanban" | "calendario" | "gantt"
+
+const VIEWS: { id: ViewType; label: string; icon: React.ElementType }[] = [
+  { id: "lista", label: "Lista", icon: List },
+  { id: "kanban", label: "Kanban", icon: LayoutGrid },
+  { id: "calendario", label: "Calendario", icon: Calendar },
+  { id: "gantt", label: "Gantt", icon: GanttChartSquare },
+]
+
+const RESPONSAVEIS = ["Daniel Vieira", "Ana Silva", "Carlos Mendes", "Roberto Lima"]
+
+export default function TarefasPage() {
+  const [tarefas, setTarefas] = useState<Tarefa[]>(MOCK_TAREFAS)
+  const [activeView, setActiveView] = useState<ViewType>("lista")
+  const [selectedTarefa, setSelectedTarefa] = useState<Tarefa | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+
+  // Filters state
+  const [filtroStatus, setFiltroStatus] = useState<string>("TODOS")
+  const [filtroResponsavel, setFiltroResponsavel] = useState<string>("TODOS")
+  const [filtroPrioridade, setFiltroPrioridade] = useState<string>("TODOS")
+  const [filtroPrazoInicio, setFiltroPrazoInicio] = useState<string>("")
+  const [filtroPrazoFim, setFiltroPrazoFim] = useState<string>("")
+  const [busca, setBusca] = useState<string>("")
+
+  // Filtered tasks
+  const tarefasFiltradas = useMemo(() => {
+    return tarefas.filter((t) => {
+      if (filtroStatus !== "TODOS" && t.status !== filtroStatus) return false
+      if (filtroResponsavel !== "TODOS" && t.responsavel !== filtroResponsavel) return false
+      if (filtroPrioridade !== "TODOS" && t.prioridade !== filtroPrioridade) return false
+      if (filtroPrazoInicio && t.prazo < filtroPrazoInicio) return false
+      if (filtroPrazoFim && t.prazo > filtroPrazoFim) return false
+      if (
+        busca.trim() &&
+        !t.titulo.toLowerCase().includes(busca.toLowerCase()) &&
+        !t.descricao.toLowerCase().includes(busca.toLowerCase()) &&
+        !t.responsavel.toLowerCase().includes(busca.toLowerCase())
+      )
+        return false
+      return true
+    })
+  }, [tarefas, filtroStatus, filtroResponsavel, filtroPrioridade, filtroPrazoInicio, filtroPrazoFim, busca])
+
+  function handleSelectTarefa(tarefa: Tarefa) {
+    setSelectedTarefa(tarefa)
+  }
+
+  function handleUpdateTarefa(updated: Tarefa) {
+    setTarefas((prev) =>
+      prev.map((t) => (t.id === updated.id ? updated : t))
+    )
+    setSelectedTarefa(updated)
+  }
+
+  function handleUpdateStatus(tarefaId: string, newStatus: StatusTarefa) {
+    setTarefas((prev) =>
+      prev.map((t) => (t.id === tarefaId ? { ...t, status: newStatus } : t))
+    )
+  }
+
+  function handleCreateTarefa(
+    data: Omit<
+      Tarefa,
+      "id" | "comentarios" | "anexos" | "atividades" | "horasTrabalhadas" | "comentariosCount" | "anexosCount"
+    >
+  ) {
+    const novaTarefa: Tarefa = {
+      ...data,
+      id: `t-${Date.now()}`,
+      comentarios: [],
+      anexos: [],
+      atividades: [
+        {
+          id: `at-${Date.now()}`,
+          acao: "Tarefa criada",
+          usuario: "Daniel Vieira",
+          data: new Date().toISOString().split("T")[0],
+        },
+      ],
+      horasTrabalhadas: 0,
+      comentariosCount: 0,
+      anexosCount: 0,
+    }
+    setTarefas((prev) => [novaTarefa, ...prev])
+  }
+
+  function clearFilters() {
+    setFiltroStatus("TODOS")
+    setFiltroResponsavel("TODOS")
+    setFiltroPrioridade("TODOS")
+    setFiltroPrazoInicio("")
+    setFiltroPrazoFim("")
+    setBusca("")
+  }
+
+  const hasActiveFilters =
+    filtroStatus !== "TODOS" ||
+    filtroResponsavel !== "TODOS" ||
+    filtroPrioridade !== "TODOS" ||
+    filtroPrazoInicio !== "" ||
+    filtroPrazoFim !== "" ||
+    busca !== ""
+
+  // Summary stats
+  const stats = useMemo(() => {
+    const total = tarefas.length
+    const emProgresso = tarefas.filter((t) => t.status === "EM_PROGRESSO").length
+    const concluidas = tarefas.filter((t) => t.status === "CONCLUIDA").length
+    const atrasadas = tarefas.filter((t) => {
+      if (t.status === "CONCLUIDA" || t.status === "CANCELADA") return false
+      return t.prazo < new Date().toISOString().split("T")[0]
+    }).length
+    return { total, emProgresso, concluidas, atrasadas }
+  }, [tarefas])
+
+  return (
+    <div className="flex flex-col h-full min-h-screen bg-background">
+      {/* Page Header */}
+      <div className="border-b border-border bg-card px-6 py-4 shrink-0">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Gestao de Tarefas</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {stats.total} tarefas · {stats.emProgresso} em progresso ·{" "}
+              {stats.concluidas} concluidas{" "}
+              {stats.atrasadas > 0 && (
+                <span className="text-red-500 font-medium">
+                  · {stats.atrasadas} atrasada{stats.atrasadas !== 1 ? "s" : ""}
+                </span>
+              )}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* View toggle */}
+            <div className="flex items-center bg-muted rounded-lg p-1 gap-0.5">
+              {VIEWS.map((view) => {
+                const Icon = view.icon
+                return (
+                  <button
+                    key={view.id}
+                    onClick={() => setActiveView(view.id)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all",
+                      activeView === view.id
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">{view.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Filter toggle */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters((p) => !p)}
+              className={cn(
+                "gap-1.5",
+                hasActiveFilters && "border-primary text-primary"
+              )}
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              Filtros
+              {hasActiveFilters && (
+                <span className="bg-primary text-primary-foreground text-[10px] rounded-full px-1.5 py-0.5 font-bold">
+                  {[filtroStatus !== "TODOS", filtroResponsavel !== "TODOS", filtroPrioridade !== "TODOS", filtroPrazoInicio !== "", filtroPrazoFim !== "", busca !== ""].filter(Boolean).length}
+                </span>
+              )}
+            </Button>
+
+            {/* Nova tarefa */}
+            <Button
+              size="sm"
+              onClick={() => setShowForm(true)}
+              className="gap-1.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white border-0 shadow-md"
+            >
+              <Plus className="h-4 w-4" />
+              Nova Tarefa
+            </Button>
+          </div>
+        </div>
+
+        {/* Filters bar */}
+        {showFilters && (
+          <div className="mt-4 flex flex-wrap items-end gap-3 pb-1">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Buscar tarefa, responsavel..."
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                className="pl-8 h-8 text-sm"
+              />
+            </div>
+
+            {/* Status */}
+            <div className="w-40">
+              <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TODOS">Todos os status</SelectItem>
+                  {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                    <SelectItem key={key} value={key}>
+                      <span className={cn("font-medium", cfg.color)}>{cfg.label}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Responsavel */}
+            <div className="w-44">
+              <Select value={filtroResponsavel} onValueChange={setFiltroResponsavel}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="Responsavel" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TODOS">Todos</SelectItem>
+                  {RESPONSAVEIS.map((r) => (
+                    <SelectItem key={r} value={r}>
+                      {r}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Prioridade */}
+            <div className="w-36">
+              <Select value={filtroPrioridade} onValueChange={setFiltroPrioridade}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="Prioridade" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TODOS">Todas</SelectItem>
+                  {Object.entries(PRIORIDADE_CONFIG).map(([key, cfg]) => (
+                    <SelectItem key={key} value={key}>
+                      <span className={cn("font-medium", cfg.color)}>{cfg.label}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Prazo range */}
+            <div className="flex items-center gap-1">
+              <Input
+                type="date"
+                value={filtroPrazoInicio}
+                onChange={(e) => setFiltroPrazoInicio(e.target.value)}
+                className="h-8 text-xs w-36"
+                placeholder="De"
+                title="Prazo inicial"
+              />
+              <span className="text-muted-foreground text-xs">até</span>
+              <Input
+                type="date"
+                value={filtroPrazoFim}
+                onChange={(e) => setFiltroPrazoFim(e.target.value)}
+                className="h-8 text-xs w-36"
+                placeholder="Ate"
+                title="Prazo final"
+              />
+            </div>
+
+            {/* Clear filters */}
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="h-8 gap-1 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+                Limpar
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Content area */}
+      <div className="flex-1 overflow-auto p-6">
+        {activeView === "lista" && (
+          <TarefaListView
+            tarefas={tarefasFiltradas}
+            onSelectTarefa={handleSelectTarefa}
+            selectedTarefaId={selectedTarefa?.id}
+          />
+        )}
+
+        {activeView === "kanban" && (
+          <TarefaKanbanView
+            tarefas={tarefasFiltradas}
+            onSelectTarefa={handleSelectTarefa}
+            onUpdateStatus={handleUpdateStatus}
+          />
+        )}
+
+        {activeView === "calendario" && (
+          <TarefaCalendarioView
+            tarefas={tarefasFiltradas}
+            onSelectTarefa={handleSelectTarefa}
+          />
+        )}
+
+        {activeView === "gantt" && (
+          <TarefaGanttView
+            tarefas={tarefasFiltradas}
+            onSelectTarefa={handleSelectTarefa}
+          />
+        )}
+      </div>
+
+      {/* Detail Panel */}
+      <TarefaDetailPanel
+        tarefa={selectedTarefa}
+        open={selectedTarefa !== null}
+        onClose={() => setSelectedTarefa(null)}
+        onUpdate={handleUpdateTarefa}
+      />
+
+      {/* Create Form */}
+      <FormTarefa
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        onSave={handleCreateTarefa}
+      />
+    </div>
+  )
+}
