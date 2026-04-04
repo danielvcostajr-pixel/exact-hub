@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Plus, Target, ArrowLeft } from 'lucide-react'
 import { useClienteContext } from '@/hooks/useClienteContext'
+import { getOKRsByEmpresa } from '@/lib/api/data-service'
 import { Button } from '@/components/ui/button'
 import { OKRCard, type OKR, type OKRStatus } from '@/components/planejamento/OKRCard'
 import { FormOKR, type OKRFormData } from '@/components/planejamento/FormOKR'
@@ -12,134 +13,23 @@ function gerarId() {
   return Math.random().toString(36).substring(2, 10)
 }
 
-const MOCK_OKRS: OKR[] = [
-  {
-    id: 'okr-1',
-    objetivo: 'Tornar-se a marca de decoracao mais lembrada da regiao',
-    descricao:
-      'Aumentar reconhecimento de marca e participacao de mercado na regiao Sudeste, consolidando a Confort Maison como referencia em design e qualidade.',
-    status: 'Ativo',
-    prazoInicio: '01/01/2025',
-    prazoFim: '31/03/2025',
-    responsavelId: 'usr-1',
-    responsavelNome: 'Ana Beatriz Costa',
-    keyResults: [
-      {
-        id: 'kr-1a',
-        descricao: 'Aumentar NPS de clientes de 52 para 75 pontos',
-        metaInicial: 52,
-        metaAlvo: 75,
-        valorAtual: 66,
-        unidade: 'pts',
-        responsavelId: 'usr-1',
-        responsavelNome: 'Ana Beatriz Costa',
-      },
-      {
-        id: 'kr-1b',
-        descricao: 'Crescer seguidores no Instagram de 12k para 25k',
-        metaInicial: 12000,
-        metaAlvo: 25000,
-        valorAtual: 18500,
-        unidade: 'seguidores',
-        responsavelId: 'usr-2',
-        responsavelNome: 'Carlos Eduardo Lima',
-      },
-      {
-        id: 'kr-1c',
-        descricao: 'Conquistar 3 premios ou mencoes em midia especializada',
-        metaInicial: 0,
-        metaAlvo: 3,
-        valorAtual: 1,
-        unidade: 'premios',
-        responsavelId: 'usr-3',
-        responsavelNome: 'Fernanda Oliveira',
-      },
-    ],
-  },
-  {
-    id: 'okr-2',
-    objetivo: 'Dobrar o faturamento online ate o fim do trimestre',
-    descricao:
-      'Alavancar o canal de e-commerce e marketplaces para reduzir dependencia das lojas fisicas e ampliar o alcance geografico da Confort Maison.',
-    status: 'Ativo',
-    prazoInicio: '01/01/2025',
-    prazoFim: '31/03/2025',
-    responsavelId: 'usr-4',
-    responsavelNome: 'Rodrigo Mendes',
-    keyResults: [
-      {
-        id: 'kr-2a',
-        descricao: 'Crescer faturamento e-commerce de R$ 80k para R$ 160k/mes',
-        metaInicial: 80000,
-        metaAlvo: 160000,
-        valorAtual: 112000,
-        unidade: 'R$',
-        responsavelId: 'usr-4',
-        responsavelNome: 'Rodrigo Mendes',
-      },
-      {
-        id: 'kr-2b',
-        descricao: 'Atingir taxa de conversao de 2,5% no site',
-        metaInicial: 1.2,
-        metaAlvo: 2.5,
-        valorAtual: 1.8,
-        unidade: '%',
-        responsavelId: 'usr-4',
-        responsavelNome: 'Rodrigo Mendes',
-      },
-      {
-        id: 'kr-2c',
-        descricao: 'Lançar loja no Mercado Livre e atingir 4 estrelas',
-        metaInicial: 0,
-        metaAlvo: 4,
-        valorAtual: 3.7,
-        unidade: 'estrelas',
-        responsavelId: 'usr-5',
-        responsavelNome: 'Patricia Sousa',
-      },
-    ],
-  },
-  {
-    id: 'okr-3',
-    objetivo: 'Construir um time de alta performance em vendas',
-    descricao:
-      'Estruturar processos, treinamentos e incentivos para transformar a equipe comercial da Confort Maison em referencia de produtividade e satisfacao.',
-    status: 'Rascunho',
-    prazoInicio: '01/04/2025',
-    prazoFim: '30/06/2025',
-    responsavelId: 'usr-5',
-    responsavelNome: 'Patricia Sousa',
-    keyResults: [
-      {
-        id: 'kr-3a',
-        descricao: 'Treinar 100% da equipe de vendas com nova metodologia',
-        metaInicial: 0,
-        metaAlvo: 100,
-        valorAtual: 0,
-        unidade: '%',
-        responsavelId: 'usr-5',
-        responsavelNome: 'Patricia Sousa',
-      },
-      {
-        id: 'kr-3b',
-        descricao: 'Aumentar ticket medio de R$ 1.800 para R$ 2.500',
-        metaInicial: 1800,
-        metaAlvo: 2500,
-        valorAtual: 1800,
-        unidade: 'R$',
-        responsavelId: 'usr-2',
-        responsavelNome: 'Carlos Eduardo Lima',
-      },
-    ],
-  },
-]
-
 const STATUS_ORDER: OKRStatus[] = ['Ativo', 'Rascunho', 'Concluido', 'Cancelado']
 
 export default function OKRsPage() {
   const { clienteAtivo, isFiltered } = useClienteContext()
-  const [okrs, setOkrs] = useState<OKR[]>(MOCK_OKRS)
+  const [okrs, setOkrs] = useState<OKR[]>([])
   const [formOpen, setFormOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (clienteAtivo) {
+      setLoading(true)
+      getOKRsByEmpresa(clienteAtivo.id)
+        .then((data) => setOkrs(data as unknown as OKR[]))
+        .catch(() => setOkrs([]))
+        .finally(() => setLoading(false))
+    }
+  }, [clienteAtivo])
 
   const statusCounts = okrs.reduce(
     (acc, o) => ({ ...acc, [o.status]: (acc[o.status] ?? 0) + 1 }),
@@ -216,6 +106,14 @@ export default function OKRsPage() {
     )
   }
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* Back + Client */}
@@ -274,12 +172,18 @@ export default function OKRsPage() {
           <OKRCard key={okr.id} okr={okr} onUpdateKRValor={handleUpdateKR} />
         ))}
         {okrs.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border rounded-xl">
-            <Target size={36} className="text-muted-foreground/40 mb-3" />
-            <p className="text-muted-foreground font-medium">Nenhum OKR cadastrado</p>
-            <p className="text-sm text-muted-foreground/60 mt-1">
-              Crie o primeiro objetivo da empresa
-            </p>
+          <div className="flex flex-col items-center justify-center py-16 gap-4">
+            <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
+              <Target size={24} className="text-muted-foreground" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-foreground mb-1">Nenhum OKR definido</h3>
+              <p className="text-sm text-muted-foreground max-w-md">Defina o primeiro objetivo para este cliente.</p>
+            </div>
+            <Button onClick={() => setFormOpen(true)} className="gradient-exact text-white mt-2">
+              <Plus size={16} />
+              Criar Primeiro OKR
+            </Button>
           </div>
         )}
       </div>

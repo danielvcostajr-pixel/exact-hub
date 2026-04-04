@@ -191,16 +191,16 @@ function KPICard({
 const PERIODOS = [6, 12, 18, 24, 36, 48, 60]
 
 const INPUT_DEFAULT: InputData = {
-  nome: 'Expansao da Operacao',
-  valorInvestimento: 80000,
+  nome: '',
+  valorInvestimento: 0,
   retornoTipo: 'fixo',
-  retornoMensal: 12000,
+  retornoMensal: 0,
   periodo: 12,
   retornosCustom: Array.from({ length: 12 }, (_, i) => ({
     mes: i + 1,
-    valor: 8000 + i * 500,
+    valor: 0,
   })),
-  taxaDescontoAnual: 12,
+  taxaDescontoAnual: 0,
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────

@@ -50,27 +50,14 @@ import {
 const ANO_BASE_DEFAULT = new Date().getFullYear() - 1
 
 const ESTADO_INICIAL: ProjecaoFinanceiraCompleta = {
-  empresaId: 'confort-maison',
-  nome: 'Projecao 2025 — Confort Maison',
+  empresaId: '',
+  nome: '',
   anoBase: ANO_BASE_DEFAULT + 1,
-  saldoInicial: 100000,
+  saldoInicial: 0,
 
   premissasVendas: {
-    historico: [
-      { mes: 1,  ano: ANO_BASE_DEFAULT, valor: 88000 },
-      { mes: 2,  ano: ANO_BASE_DEFAULT, valor: 82000 },
-      { mes: 3,  ano: ANO_BASE_DEFAULT, valor: 95000 },
-      { mes: 4,  ano: ANO_BASE_DEFAULT, valor: 91000 },
-      { mes: 5,  ano: ANO_BASE_DEFAULT, valor: 104000 },
-      { mes: 6,  ano: ANO_BASE_DEFAULT, valor: 110000 },
-      { mes: 7,  ano: ANO_BASE_DEFAULT, valor: 107000 },
-      { mes: 8,  ano: ANO_BASE_DEFAULT, valor: 118000 },
-      { mes: 9,  ano: ANO_BASE_DEFAULT, valor: 122000 },
-      { mes: 10, ano: ANO_BASE_DEFAULT, valor: 130000 },
-      { mes: 11, ano: ANO_BASE_DEFAULT, valor: 143000 },
-      { mes: 12, ano: ANO_BASE_DEFAULT, valor: 150000 },
-    ],
-    taxaCrescimentoBase: 15,
+    historico: [],
+    taxaCrescimentoBase: 0,
     cenarios: {
       pessimista: -14,
       realista: 0,
@@ -81,40 +68,23 @@ const ESTADO_INICIAL: ProjecaoFinanceiraCompleta = {
   },
 
   condicoesRecebimento: {
-    percentualAVista: 38,
-    percentualAPrazo: 62,
-    distribuicaoParcelas: [
-      { qtdParcelas: 4, percentual: 100 },
-    ],
+    percentualAVista: 0,
+    percentualAPrazo: 0,
+    distribuicaoParcelas: [],
     antecipaRecebiveis: false,
-    percentualAntecipacao: 95,
-    taxaDesconto: 7,
+    percentualAntecipacao: 0,
+    taxaDesconto: 0,
   },
 
   condicoesPagamento: {
-    percentualAVista: 1,
-    percentualAPrazo: 99,
-    distribuicaoParcelas: [
-      { qtdParcelas: 1, percentual: 50 },
-      { qtdParcelas: 2, percentual: 38 },
-      { qtdParcelas: 3, percentual: 10 },
-      { qtdParcelas: 4, percentual: 2 },
-    ],
+    percentualAVista: 0,
+    percentualAPrazo: 0,
+    distribuicaoParcelas: [],
   },
 
   despesas: {
-    variaveis: [
-      { id: '1', nome: 'Impostos / Simples', percentual: 11, categoria: 'impostos' },
-      { id: '2', nome: 'Comissoes de Vendas', percentual: 1,  categoria: 'comissoes' },
-      { id: '3', nome: 'CMV / CPV',           percentual: 53, categoria: 'cmv' },
-    ],
-    fixos: [
-      { id: '4', nome: 'Pessoal / CLT',         valor: 40000, categoria: 'pessoal' },
-      { id: '5', nome: 'Pro-labore Diretoria',   valor: 15000, categoria: 'diretoria' },
-      { id: '6', nome: 'Comercial / Marketing',  valor: 6000,  categoria: 'comercial' },
-      { id: '7', nome: 'Administrativo',         valor: 8000,  categoria: 'administrativo' },
-      { id: '8', nome: 'Financeiro',             valor: 2000,  categoria: 'financeiro' },
-    ],
+    variaveis: [],
+    fixos: [],
   },
 
   investimentos: [],

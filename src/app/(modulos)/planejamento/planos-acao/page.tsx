@@ -41,136 +41,6 @@ const USUARIOS_RACI: UsuarioRaci[] = [
   { id: 'usr-5', nome: 'Patricia', papel: 'RH' },
 ]
 
-const MOCK_PLANOS: PlanoAcao[] = [
-  {
-    id: 'plan-1',
-    titulo: 'Lancamento do Canal Digital',
-    descricao:
-      'Plano de acoes para estruturar e lancar o canal de vendas online da Confort Maison, cobrindo e-commerce, marketplaces e campanhas digitais.',
-    okrVinculadoId: 'okr-2',
-    okrVinculadoTitulo: 'Dobrar o faturamento online ate o fim do trimestre',
-    status: 'Ativo',
-    responsavel: 'Rodrigo Mendes',
-    prazoFim: '31/03/2025',
-    acoes: [
-      {
-        id: 'ac-1a',
-        descricao: 'Contratar agencia de performance digital',
-        responsavel: 'Ana Beatriz Costa',
-        prazo: '10/01/2025',
-        status: 'Concluida',
-        prioridade: 'Alta',
-        atribuicoes: { 'usr-1': 'A', 'usr-3': 'R', 'usr-4': 'C', 'usr-2': 'I', 'usr-5': null },
-      },
-      {
-        id: 'ac-1b',
-        descricao: 'Configurar e-commerce com catalogo inicial de 50 produtos',
-        responsavel: 'Rodrigo Mendes',
-        prazo: '20/01/2025',
-        status: 'Concluida',
-        prioridade: 'Alta',
-        atribuicoes: { 'usr-1': 'A', 'usr-3': 'C', 'usr-4': 'R', 'usr-2': 'C', 'usr-5': null },
-      },
-      {
-        id: 'ac-1c',
-        descricao: 'Criar conta no Mercado Livre e cadastrar produtos',
-        responsavel: 'Rodrigo Mendes',
-        prazo: '31/01/2025',
-        status: 'Em Andamento',
-        prioridade: 'Alta',
-        atribuicoes: { 'usr-1': 'I', 'usr-3': 'C', 'usr-4': 'R', 'usr-2': 'A', 'usr-5': null },
-      },
-      {
-        id: 'ac-1d',
-        descricao: 'Definir estrategia de trafego pago (Google + Meta Ads)',
-        responsavel: 'Fernanda Oliveira',
-        prazo: '15/02/2025',
-        status: 'Em Andamento',
-        prioridade: 'Media',
-        atribuicoes: { 'usr-1': 'A', 'usr-3': 'R', 'usr-4': 'C', 'usr-2': 'I', 'usr-5': null },
-      },
-      {
-        id: 'ac-1e',
-        descricao: 'Implementar sistema de logistica reversa',
-        responsavel: 'Rodrigo Mendes',
-        prazo: '28/02/2025',
-        status: 'Pendente',
-        prioridade: 'Media',
-        atribuicoes: { 'usr-1': 'A', 'usr-3': 'I', 'usr-4': 'R', 'usr-2': 'C', 'usr-5': null },
-      },
-    ],
-  },
-  {
-    id: 'plan-2',
-    titulo: 'Programa de Fidelizacao de Clientes',
-    descricao:
-      'Estruturar um programa de pontos e beneficios para reter clientes e aumentar o NPS da Confort Maison.',
-    okrVinculadoId: 'okr-1',
-    okrVinculadoTitulo: 'Tornar-se a marca de decoracao mais lembrada da regiao',
-    status: 'Ativo',
-    responsavel: 'Ana Beatriz Costa',
-    prazoFim: '30/06/2025',
-    acoes: [
-      {
-        id: 'ac-2a',
-        descricao: 'Pesquisa de satisfacao com 200 clientes ativos',
-        responsavel: 'Ana Beatriz Costa',
-        prazo: '15/01/2025',
-        status: 'Concluida',
-        prioridade: 'Alta',
-        atribuicoes: { 'usr-1': 'R', 'usr-3': 'C', 'usr-4': null, 'usr-2': 'I', 'usr-5': 'A' },
-      },
-      {
-        id: 'ac-2b',
-        descricao: 'Definir mecanica do programa de fidelidade',
-        responsavel: 'Ana Beatriz Costa',
-        prazo: '01/02/2025',
-        status: 'Em Andamento',
-        prioridade: 'Alta',
-        atribuicoes: { 'usr-1': 'R', 'usr-3': 'C', 'usr-4': 'C', 'usr-2': 'C', 'usr-5': 'A' },
-      },
-      {
-        id: 'ac-2c',
-        descricao: 'Desenvolver app ou cartao de fidelidade',
-        responsavel: 'Rodrigo Mendes',
-        prazo: '01/04/2025',
-        status: 'Pendente',
-        prioridade: 'Media',
-        atribuicoes: { 'usr-1': 'A', 'usr-3': 'C', 'usr-4': 'R', 'usr-2': 'I', 'usr-5': 'I' },
-      },
-    ],
-  },
-  {
-    id: 'plan-3',
-    titulo: 'Reestruturacao do Processo de Vendas',
-    descricao:
-      'Mapear, documentar e otimizar o processo comercial da Confort Maison para aumentar a conversao e o ticket medio.',
-    status: 'Rascunho',
-    responsavel: 'Patricia Sousa',
-    prazoFim: '30/06/2025',
-    acoes: [
-      {
-        id: 'ac-3a',
-        descricao: 'Mapear o processo de vendas atual (as-is)',
-        responsavel: 'Patricia Sousa',
-        prazo: '15/04/2025',
-        status: 'Pendente',
-        prioridade: 'Alta',
-        atribuicoes: { 'usr-1': 'A', 'usr-3': null, 'usr-4': null, 'usr-2': 'C', 'usr-5': 'R' },
-      },
-      {
-        id: 'ac-3b',
-        descricao: 'Definir novo playbook comercial',
-        responsavel: 'Carlos Eduardo Lima',
-        prazo: '30/04/2025',
-        status: 'Pendente',
-        prioridade: 'Alta',
-        atribuicoes: { 'usr-1': 'A', 'usr-3': null, 'usr-4': null, 'usr-2': 'R', 'usr-5': 'C' },
-      },
-    ],
-  },
-]
-
 const STATUS_STYLES: Record<string, string> = {
   Ativo: 'bg-blue-500/15 text-blue-500 border-blue-500/30',
   Concluido: 'bg-green-500/15 text-green-500 border-green-500/30',
@@ -341,7 +211,7 @@ function PlanoCard({ plano }: { plano: PlanoAcao }) {
 
 export default function PlanosAcaoPage() {
   const { clienteAtivo, isFiltered } = useClienteContext()
-  const [planos] = useState<PlanoAcao[]>(MOCK_PLANOS)
+  const [planos] = useState<PlanoAcao[]>([])
 
   const ativos = planos.filter((p) => p.status === 'Ativo').length
   const totalAcoes = planos.reduce((s, p) => s + p.acoes.length, 0)
@@ -375,7 +245,7 @@ export default function PlanosAcaoPage() {
             Planos de Acao
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {planos.length} plano{planos.length !== 1 ? 's' : ''} — Confort Maison
+            {planos.length} plano{planos.length !== 1 ? 's' : ''} — {clienteAtivo?.nome ?? 'Cliente'}
           </p>
         </div>
         <Button
@@ -409,6 +279,21 @@ export default function PlanosAcaoPage() {
         {planos.map((plano) => (
           <PlanoCard key={plano.id} plano={plano} />
         ))}
+        {planos.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-16 gap-4">
+            <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
+              <ListChecks size={24} className="text-muted-foreground" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-foreground mb-1">Nenhum plano de acao criado</h3>
+              <p className="text-sm text-muted-foreground max-w-md">Crie o primeiro plano de acao para este cliente.</p>
+            </div>
+            <Button className="gradient-exact text-white mt-2">
+              <Plus size={16} />
+              Criar Primeiro Plano
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )

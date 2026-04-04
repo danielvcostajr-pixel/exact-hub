@@ -14,160 +14,6 @@ function gerarId() {
   return Math.random().toString(36).substring(2, 10)
 }
 
-const MOCK_ROTINAS: Rotina[] = [
-  {
-    id: 'rot-1',
-    nome: 'Fechamento Financeiro Mensal',
-    descricao:
-      'Rotina completa de fechamento do mes financeiro: conciliacao bancaria, DRE parcial, contas a pagar/receber e provisoes.',
-    categoria: 'Financeiro',
-    frequencia: 'MENSAL',
-    diaExecucao: 'Dia 5',
-    proximaExecucao: '05/04/2025',
-    ultimaExecucao: '05/03/2025',
-    itens: [
-      {
-        id: 'it-1a',
-        descricao: 'Conciliar extrato bancario com lancamentos do sistema',
-        obrigatorio: true,
-        tipo: 'CHECK',
-        dica: 'Verificar todas as contas correntes e aplicacoes',
-      },
-      {
-        id: 'it-1b',
-        descricao: 'Conferir contas a receber em aberto',
-        obrigatorio: true,
-        tipo: 'CHECK',
-        dica: 'Identificar inadimplentes acima de 30 dias',
-      },
-      {
-        id: 'it-1c',
-        descricao: 'Conferir contas a pagar vencidas e a vencer',
-        obrigatorio: true,
-        tipo: 'CHECK',
-        dica: 'Priorizar pagamentos criticos',
-      },
-      {
-        id: 'it-1d',
-        descricao: 'Calcular DRE parcial do mes',
-        obrigatorio: true,
-        tipo: 'CHECK',
-        dica: 'Comparar com orcamento previsto',
-      },
-      {
-        id: 'it-1e',
-        descricao: 'Registrar provisoes do mes (ferias, 13o, etc.)',
-        obrigatorio: true,
-        tipo: 'CHECK',
-      },
-      {
-        id: 'it-1f',
-        descricao: 'Apurar resultado do mes (lucro/prejuizo)',
-        obrigatorio: true,
-        tipo: 'NUMERO',
-        dica: 'Valor em R$',
-      },
-      {
-        id: 'it-1g',
-        descricao: 'Enviar relatorio financeiro para a diretoria',
-        obrigatorio: true,
-        tipo: 'CHECK',
-      },
-      {
-        id: 'it-1h',
-        descricao: 'Observacoes e pendencias do fechamento',
-        obrigatorio: false,
-        tipo: 'TEXTO',
-      },
-    ],
-  },
-  {
-    id: 'rot-2',
-    nome: 'Reuniao Comercial Semanal',
-    descricao:
-      'Reuniao de alinhamento da equipe comercial: pipeline, metas, oportunidades e proximos passos.',
-    categoria: 'Comercial',
-    frequencia: 'SEMANAL',
-    diaExecucao: 'Segunda-feira',
-    proximaExecucao: '07/04/2025',
-    ultimaExecucao: '31/03/2025',
-    itens: [
-      {
-        id: 'it-2a',
-        descricao: 'Revisar pipeline de vendas atualizado',
-        obrigatorio: true,
-        tipo: 'CHECK',
-        dica: 'Atualizar status de cada oportunidade',
-      },
-      {
-        id: 'it-2b',
-        descricao: 'Conferir meta semanal x realizado',
-        obrigatorio: true,
-        tipo: 'NUMERO',
-        dica: 'Percentual de atingimento',
-      },
-      {
-        id: 'it-2c',
-        descricao: 'Identificar oportunidades quentes para semana',
-        obrigatorio: true,
-        tipo: 'CHECK',
-      },
-      {
-        id: 'it-2d',
-        descricao: 'Definir acoes de follow-up com clientes',
-        obrigatorio: true,
-        tipo: 'CHECK',
-      },
-      {
-        id: 'it-2e',
-        descricao: 'Registrar dificuldades e pontos de atencao',
-        obrigatorio: false,
-        tipo: 'TEXTO',
-      },
-    ],
-  },
-  {
-    id: 'rot-3',
-    nome: 'Controle de Estoque',
-    descricao:
-      'Verificacao semanal do estoque: inventario, rupturas, produtos vencendo e pedidos de reposicao.',
-    categoria: 'Operacional',
-    frequencia: 'SEMANAL',
-    diaExecucao: 'Sexta-feira',
-    proximaExecucao: '04/04/2025',
-    ultimaExecucao: '28/03/2025',
-    itens: [
-      {
-        id: 'it-3a',
-        descricao: 'Realizar contagem fisica dos produtos criticos',
-        obrigatorio: true,
-        tipo: 'CHECK',
-        dica: 'SKUs A e B da curva ABC',
-      },
-      {
-        id: 'it-3b',
-        descricao: 'Identificar rupturas ou risco de ruptura',
-        obrigatorio: true,
-        tipo: 'CHECK',
-        dica: 'Estoque abaixo do ponto de pedido',
-      },
-      {
-        id: 'it-3c',
-        descricao: 'Verificar produtos proximos ao vencimento',
-        obrigatorio: true,
-        tipo: 'CHECK',
-        dica: 'Priorizar saida de produtos com menos de 30 dias',
-      },
-      {
-        id: 'it-3d',
-        descricao: 'Gerar pedidos de reposicao necessarios',
-        obrigatorio: false,
-        tipo: 'CHECK',
-      },
-    ],
-  },
-]
-
 function templateParaRotina(tpl: RotinaTemplate): Rotina {
   return {
     id: gerarId(),
@@ -211,7 +57,7 @@ const CAT_COLORS: Record<string, string> = {
 
 export default function RotinasPage() {
   const { clienteAtivo, isFiltered } = useClienteContext()
-  const [rotinas, setRotinas] = useState<Rotina[]>(MOCK_ROTINAS)
+  const [rotinas, setRotinas] = useState<Rotina[]>([])
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [finalizadas, setFinalizadas] = useState<Set<string>>(new Set())
 
@@ -249,7 +95,7 @@ export default function RotinasPage() {
             Rotinas e Itens de Controle
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {rotinas.length} rotina{rotinas.length !== 1 ? 's' : ''} ativa{rotinas.length !== 1 ? 's' : ''} — Confort Maison
+            {rotinas.length} rotina{rotinas.length !== 1 ? 's' : ''} ativa{rotinas.length !== 1 ? 's' : ''} — {clienteAtivo?.nome ?? 'Cliente'}
           </p>
         </div>
         <Button

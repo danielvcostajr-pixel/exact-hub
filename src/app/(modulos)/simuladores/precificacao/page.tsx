@@ -86,17 +86,17 @@ const calcularSensibilidade = (
 export default function PrecificacaoPage() {
   const { clienteAtivo, isFiltered } = useClienteContext()
   // Custos
-  const [custoProduto, setCustoProduto] = useState<string>('85')
-  const [custosFixosRateados, setCustosFixosRateados] = useState<string>('30')
+  const [custoProduto, setCustoProduto] = useState<string>('')
+  const [custosFixosRateados, setCustosFixosRateados] = useState<string>('')
 
   // Impostos e comissões
-  const [impostos, setImpostos] = useState<string>('8')
-  const [comissoes, setComissoes] = useState<string>('5')
+  const [impostos, setImpostos] = useState<string>('')
+  const [comissoes, setComissoes] = useState<string>('')
 
   // Método
   const [metodo, setMetodo] = useState<Metodo>('markup')
-  const [markupPercentual, setMarkupPercentual] = useState<string>('80')
-  const [margemDesejada, setMargemDesejada] = useState<string>('30')
+  const [markupPercentual, setMarkupPercentual] = useState<string>('')
+  const [margemDesejada, setMargemDesejada] = useState<string>('')
 
   // Sensibilidade
   const [sensibilidade, setSensibilidade] = useState(false)

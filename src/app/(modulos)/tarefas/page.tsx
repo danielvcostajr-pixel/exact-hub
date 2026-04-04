@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
 import {
   List,
@@ -33,10 +33,10 @@ import FormTarefa from "@/components/tarefas/FormTarefa"
 import {
   Tarefa,
   StatusTarefa,
-  MOCK_TAREFAS,
   STATUS_CONFIG,
   PRIORIDADE_CONFIG,
 } from "@/components/tarefas/tarefas-types"
+import { getTarefasByEmpresa } from "@/lib/api/data-service"
 
 type ViewType = "lista" | "kanban" | "calendario" | "gantt"
 
@@ -51,8 +51,19 @@ const RESPONSAVEIS = ["Daniel Vieira", "Ana Silva", "Carlos Mendes", "Roberto Li
 
 export default function TarefasPage() {
   const { clienteAtivo, isFiltered } = useClienteContext()
-  const [tarefas, setTarefas] = useState<Tarefa[]>(MOCK_TAREFAS)
+  const [tarefas, setTarefas] = useState<Tarefa[]>([])
+  const [loading, setLoading] = useState(true)
   const [activeView, setActiveView] = useState<ViewType>("lista")
+
+  useEffect(() => {
+    if (clienteAtivo) {
+      setLoading(true)
+      getTarefasByEmpresa(clienteAtivo.id)
+        .then((data) => setTarefas(data as unknown as Tarefa[]))
+        .catch(() => setTarefas([]))
+        .finally(() => setLoading(false))
+    }
+  }, [clienteAtivo])
   const [selectedTarefa, setSelectedTarefa] = useState<Tarefa | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
@@ -160,6 +171,44 @@ export default function TarefasPage() {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
         <p className="text-muted-foreground">Selecione um cliente no seletor acima para visualizar os dados.</p>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    )
+  }
+
+  if (tarefas.length === 0) {
+    return (
+      <div className="flex flex-col h-full min-h-screen bg-background">
+        <div className="border-b border-border bg-card px-6 py-4 shrink-0">
+          <div className="flex items-center gap-3 mb-2">
+            <Link href="/consultor" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <ArrowLeft size={16} />
+              Voltar
+            </Link>
+            {clienteAtivo && <span className="text-sm text-primary font-medium">{clienteAtivo.nome}</span>}
+          </div>
+        </div>
+        <div className="flex flex-col items-center justify-center py-16 gap-4 flex-1">
+          <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
+            <List size={24} className="text-muted-foreground" />
+          </div>
+          <div className="text-center">
+            <h3 className="text-lg font-semibold text-foreground mb-1">Nenhuma tarefa cadastrada</h3>
+            <p className="text-sm text-muted-foreground max-w-md">Crie a primeira tarefa.</p>
+          </div>
+          <Button onClick={() => setShowForm(true)} className="gradient-exact text-white mt-2">
+            <Plus className="h-4 w-4" />
+            Criar Primeira Tarefa
+          </Button>
+        </div>
+        <FormTarefa open={showForm} onClose={() => setShowForm(false)} onSave={handleCreateTarefa} />
       </div>
     )
   }

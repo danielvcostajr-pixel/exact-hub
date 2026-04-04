@@ -66,9 +66,9 @@ const CENARIOS_DEFAULT: Cenario[] = [
 ]
 
 const BASE_DEFAULT: BaseData = {
-  faturamentoMensal: 150000,
-  custosFixos: 45000,
-  custosVariaveisPct: 30,
+  faturamentoMensal: 0,
+  custosFixos: 0,
+  custosVariaveisPct: 0,
 }
 
 const PERIODO = 12

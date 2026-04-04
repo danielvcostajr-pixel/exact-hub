@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Calendar, Plus, MapPin, Link2, Clock, Users, FileText, X, ArrowLeft } from "lucide-react"
 import { useClienteContext } from "@/hooks/useClienteContext"
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FormReuniao, type ReuniaoFormData } from "@/components/acompanhamento/FormReuniao"
+import { getReunioesByEmpresa } from "@/lib/api/data-service"
 import { AtaReuniao } from "@/components/acompanhamento/AtaReuniao"
 
 type StatusReuniao = "AGENDADA" | "REALIZADA" | "CANCELADA"
@@ -26,57 +27,6 @@ interface Reuniao {
   status: StatusReuniao
   pauta: string
 }
-
-const mockReunioes: Reuniao[] = [
-  {
-    id: "1",
-    titulo: "Alinhamento Mensal — Geny",
-    descricao: "Revisao dos resultados do mes e planejamento do proximo ciclo",
-    dataHora: "2026-04-10T14:00",
-    duracaoMinutos: 60,
-    tipo: "online",
-    link: "https://meet.google.com/abc-defg-hij",
-    participantes: ["Roberto Ferreira", "Daniel Vieira", "Ana Lima"],
-    status: "AGENDADA",
-    pauta: "1. Revisao de resultados de marco\n2. KPIs do trimestre\n3. Proximas acoes",
-  },
-  {
-    id: "2",
-    titulo: "Workshop de Processos — TechVision",
-    descricao: "Mapeamento dos processos internos de vendas",
-    dataHora: "2026-04-15T09:00",
-    duracaoMinutos: 120,
-    tipo: "presencial",
-    local: "Sede TechVision — Sala de Reunioes A",
-    participantes: ["Carla Mendes", "Daniel Vieira", "Marcos Oliveira", "Felipe Santos"],
-    status: "AGENDADA",
-    pauta: "1. Apresentacao do metodo\n2. Mapeamento AS-IS\n3. Identificacao de gaps",
-  },
-  {
-    id: "3",
-    titulo: "Revisao de OKRs — Nordeste",
-    descricao: "Acompanhamento trimestral dos OKRs definidos",
-    dataHora: "2026-03-28T10:00",
-    duracaoMinutos: 90,
-    tipo: "online",
-    link: "https://zoom.us/j/12345678",
-    participantes: ["Felipe Santos", "Daniel Vieira"],
-    status: "REALIZADA",
-    pauta: "1. Status dos OKRs\n2. Indicadores de progresso\n3. Ajustes necessarios",
-  },
-  {
-    id: "4",
-    titulo: "Kick-off Projeto Analytics",
-    descricao: "Reuniao inicial do projeto de analytics",
-    dataHora: "2026-03-20T15:30",
-    duracaoMinutos: 60,
-    tipo: "presencial",
-    local: "Escritorio Exact BI",
-    participantes: ["Roberto Ferreira", "Carla Mendes", "Daniel Vieira", "Ana Lima", "Marcos Oliveira"],
-    status: "REALIZADA",
-    pauta: "1. Apresentacao da equipe\n2. Escopo do projeto\n3. Cronograma",
-  },
-]
 
 const statusConfig: Record<StatusReuniao, { label: string; className: string }> = {
   AGENDADA: { label: "Agendada", className: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30" },
@@ -207,8 +157,19 @@ function ReuniaoCard({
 
 export default function ReunioesPage() {
   const { clienteAtivo, isFiltered } = useClienteContext()
-  const [reunioes, setReunioes] = useState<Reuniao[]>(mockReunioes)
+  const [reunioes, setReunioes] = useState<Reuniao[]>([])
   const [formOpen, setFormOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (clienteAtivo) {
+      setLoading(true)
+      getReunioesByEmpresa(clienteAtivo.id)
+        .then((data) => setReunioes(data as unknown as Reuniao[]))
+        .catch(() => setReunioes([]))
+        .finally(() => setLoading(false))
+    }
+  }, [clienteAtivo])
   const [ataReuniao, setAtaReuniao] = useState<Reuniao | null>(null)
 
   const proximas = reunioes.filter((r) => r.status === "AGENDADA")
@@ -240,6 +201,14 @@ export default function ReunioesPage() {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
         <p className="text-muted-foreground">Selecione um cliente no seletor acima para visualizar os dados.</p>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     )
   }

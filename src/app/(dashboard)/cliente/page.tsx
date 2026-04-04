@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { useClienteContext } from "@/hooks/useClienteContext"
 
 type ModuleStatus = "complete" | "in_progress" | "pending"
 
@@ -34,30 +35,30 @@ const modules: Module[] = [
     title: "Projecao Financeira",
     description: "Cenarios financeiros, DRE projetado e fluxo de caixa",
     icon: TrendingUp,
-    status: "complete",
-    progress: 100,
+    status: "pending",
+    progress: 0,
     href: "/cliente/projecao",
-    lastUpdate: "3 dias atras",
+    lastUpdate: undefined,
   },
   {
     id: "canvas",
     title: "Canvas de Negocio",
     description: "Modelo de negocio, proposta de valor e segmentos",
     icon: Grid3x3,
-    status: "in_progress",
-    progress: 65,
+    status: "pending",
+    progress: 0,
     href: "/cliente/canvas",
-    lastUpdate: "Ontem",
+    lastUpdate: undefined,
   },
   {
     id: "entrevistas",
     title: "Entrevistas",
     description: "Diagnostico organizacional e entrevistas com a equipe",
     icon: MessageSquare,
-    status: "in_progress",
-    progress: 40,
+    status: "pending",
+    progress: 0,
     href: "/cliente/entrevistas",
-    lastUpdate: "Ha 2 dias",
+    lastUpdate: undefined,
   },
   {
     id: "memoria",
@@ -102,6 +103,7 @@ function getOverallProgress(mods: Module[]) {
 }
 
 export default function ClienteDashboard() {
+  const { clienteAtivo } = useClienteContext()
   const overallProgress = getOverallProgress(modules)
   const completedCount = modules.filter((m) => m.status === "complete").length
 
@@ -110,7 +112,7 @@ export default function ClienteDashboard() {
       {/* Welcome */}
       <div>
         <h2 className="text-2xl font-bold text-foreground">
-          Bem-vindo, Empresa
+          Bem-vindo, {clienteAtivo?.nome ?? 'Empresa'}
         </h2>
         <p className="text-sm text-muted-foreground mt-0.5">
           Acompanhe o progresso da sua consultoria

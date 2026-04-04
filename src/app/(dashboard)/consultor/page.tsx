@@ -98,27 +98,9 @@ const d = (offsetDays: number) => {
 const fmt = (dt: Date) =>
   dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
 
-const mockTasks: Task[] = [
-  { id: "t1",  name: "Entregar relatorio de diagnostico", client: "Alumifont",        clientId: "1", priority: "Alta",  deadline: fmt(d(-2)), deadlineDate: d(-2), status: "Atrasada" },
-  { id: "t2",  name: "Revisar canvas de negocio",         client: "Pizzaria Bella",   clientId: "2", priority: "Alta",  deadline: fmt(d(-1)), deadlineDate: d(-1), status: "Atrasada" },
-  { id: "t3",  name: "Reuniao de alinhamento OKRs",       client: "Casa Gramado",     clientId: "4", priority: "Alta",  deadline: fmt(d(0)),  deadlineDate: d(0),  status: "Hoje" },
-  { id: "t4",  name: "Enviar planilha de projecao",       client: "Tech Solutions",   clientId: "5", priority: "Media", deadline: fmt(d(0)),  deadlineDate: d(0),  status: "Hoje" },
-  { id: "t5",  name: "Validar plano de acao Q2",          client: "Geny Eletros",     clientId: "6", priority: "Alta",  deadline: fmt(d(1)),  deadlineDate: d(1),  status: "Esta Semana" },
-  { id: "t6",  name: "Apresentar resultados mensais",     client: "Confort Maison",   clientId: "8", priority: "Media", deadline: fmt(d(2)),  deadlineDate: d(2),  status: "Esta Semana" },
-  { id: "t7",  name: "Mapear processos internos",         client: "Auto Center JP",   clientId: "3", priority: "Baixa", deadline: fmt(d(3)),  deadlineDate: d(3),  status: "Esta Semana" },
-  { id: "t8",  name: "Entrevista com lider de operacoes", client: "Farmacia Popular", clientId: "7", priority: "Alta",  deadline: fmt(d(4)),  deadlineDate: d(4),  status: "Esta Semana" },
-  { id: "t9",  name: "Fechar relatorio semanal",          client: "Geny Eletros",     clientId: "6", priority: "Media", deadline: fmt(d(5)),  deadlineDate: d(5),  status: "Esta Semana" },
-  { id: "t10", name: "Revisao de rotinas e KPIs",         client: "Casa Gramado",     clientId: "4", priority: "Baixa", deadline: fmt(d(8)),  deadlineDate: d(8),  status: "Proxima Semana" },
-]
+const mockTasks: Task[] = []
 
-const weeklyHours = [
-  { client: "Geny Eletros",     clientId: "6", horas: 6.5, fill: "#f97316" },
-  { client: "Farmacia Popular", clientId: "7", horas: 4.0, fill: "#3b82f6" },
-  { client: "Casa Gramado",     clientId: "4", horas: 3.5, fill: "#22c55e" },
-  { client: "Tech Solutions",   clientId: "5", horas: 3.0, fill: "#a855f7" },
-  { client: "Alumifont",        clientId: "1", horas: 2.0, fill: "#eab308" },
-  { client: "Confort Maison",   clientId: "8", horas: 1.5, fill: "#ec4899" },
-]
+const weeklyHours: { client: string; clientId: string; horas: number; fill: string }[] = []
 
 // ─── Phase Config ──────────────────────────────────────────────────────────────
 

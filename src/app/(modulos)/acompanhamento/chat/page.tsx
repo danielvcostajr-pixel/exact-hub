@@ -32,141 +32,9 @@ interface Conversation {
   messages: Message[]
 }
 
-const mockConversations: Conversation[] = [
-  {
-    id: "1",
-    company: "Geny Eletrodomesticos",
-    companyInitials: "GE",
-    lastMessage: "Perfeito! Vamos revisar o plano na proxima reuniao.",
-    lastMessageTime: "10:42",
-    unreadCount: 3,
-    isOnline: true,
-    messages: [
-      {
-        id: "m1",
-        content: "Bom dia! Recebi o relatorio da semana passada. Muito bom trabalho!",
-        sender: "Roberto Ferreira",
-        senderInitials: "RF",
-        timestamp: "09:15",
-        isOwn: false,
-      },
-      {
-        id: "m2",
-        content: "Obrigado Roberto! Ficamos felizes que gostou. Voce teve chance de analisar as metricas de conversao?",
-        sender: "Daniel Vieira",
-        senderInitials: "DV",
-        timestamp: "09:22",
-        isOwn: true,
-      },
-      {
-        id: "m3",
-        content: "Sim, olhei sim. A taxa de conversao no e-commerce subiu 2.3 pontos. Estamos no caminho certo.",
-        sender: "Roberto Ferreira",
-        senderInitials: "RF",
-        timestamp: "09:45",
-        isOwn: false,
-      },
-      {
-        id: "m4",
-        content: "Excelente! Para a proxima sprint, sugiro focarmos na otimizacao do checkout. Os dados indicam abandono na etapa de pagamento.",
-        sender: "Daniel Vieira",
-        senderInitials: "DV",
-        timestamp: "10:10",
-        isOwn: true,
-      },
-      {
-        id: "m5",
-        content: "Concordo. Ja passei isso para o time de TI. Quando podemos agendar uma reuniao para alinhar os detalhes?",
-        sender: "Roberto Ferreira",
-        senderInitials: "RF",
-        timestamp: "10:35",
-        isOwn: false,
-      },
-      {
-        id: "m6",
-        content: "Perfeito! Vamos revisar o plano na proxima reuniao.",
-        sender: "Roberto Ferreira",
-        senderInitials: "RF",
-        timestamp: "10:42",
-        isOwn: false,
-      },
-    ],
-  },
-  {
-    id: "2",
-    company: "TechVision Solucoes",
-    companyInitials: "TV",
-    lastMessage: "Precisamos remarcar para semana que vem.",
-    lastMessageTime: "Ontem",
-    unreadCount: 1,
-    isOnline: false,
-    messages: [
-      {
-        id: "m1",
-        content: "Daniel, tudo bem? Queria confirmar a reuniao de amanha as 14h.",
-        sender: "Carla Mendes",
-        senderInitials: "CM",
-        timestamp: "14:20",
-        isOwn: false,
-      },
-      {
-        id: "m2",
-        content: "Oi Carla! Infelizmente tive um compromisso urgente. Podemos remarcar?",
-        sender: "Daniel Vieira",
-        senderInitials: "DV",
-        timestamp: "15:05",
-        isOwn: true,
-      },
-      {
-        id: "m3",
-        content: "Precisamos remarcar para semana que vem.",
-        sender: "Carla Mendes",
-        senderInitials: "CM",
-        timestamp: "15:30",
-        isOwn: false,
-      },
-    ],
-  },
-  {
-    id: "3",
-    company: "Nordeste Distribuidora",
-    companyInitials: "ND",
-    lastMessage: "Obrigado pelo suporte! O dashboard ficou otimo.",
-    lastMessageTime: "Ter",
-    unreadCount: 0,
-    isOnline: true,
-    messages: [
-      {
-        id: "m1",
-        content: "Daniel, o novo dashboard de vendas ficou incrivel! A equipe adorou.",
-        sender: "Felipe Santos",
-        senderInitials: "FS",
-        timestamp: "11:00",
-        isOwn: false,
-      },
-      {
-        id: "m2",
-        content: "Que otimo, Felipe! Fico feliz que tenha sido util. Qualquer ajuste que precisarem, e so falar.",
-        sender: "Daniel Vieira",
-        senderInitials: "DV",
-        timestamp: "11:15",
-        isOwn: true,
-      },
-      {
-        id: "m3",
-        content: "Obrigado pelo suporte! O dashboard ficou otimo.",
-        sender: "Felipe Santos",
-        senderInitials: "FS",
-        timestamp: "11:20",
-        isOwn: false,
-      },
-    ],
-  },
-]
-
 export default function ChatPage() {
   const { clienteAtivo, isFiltered } = useClienteContext()
-  const [conversations] = useState<Conversation[]>(mockConversations)
+  const [conversations] = useState<Conversation[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string>("1")
   const [messageInput, setMessageInput] = useState("")
   const [search, setSearch] = useState("")
@@ -191,6 +59,29 @@ export default function ChatPage() {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
         <p className="text-muted-foreground">Selecione um cliente no seletor acima para visualizar os dados.</p>
+      </div>
+    )
+  }
+
+  if (conversations.length === 0) {
+    return (
+      <div className="flex flex-col h-full bg-background">
+        <div className="flex items-center gap-3 p-4 border-b border-border">
+          <Link href="/consultor" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft size={16} />
+            Voltar
+          </Link>
+          {clienteAtivo && <span className="text-sm text-primary font-medium">{clienteAtivo.nome}</span>}
+        </div>
+        <div className="flex flex-col items-center justify-center py-16 gap-4 flex-1">
+          <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
+            <Send size={24} className="text-muted-foreground" />
+          </div>
+          <div className="text-center">
+            <h3 className="text-lg font-semibold text-foreground mb-1">Nenhuma conversa iniciada</h3>
+            <p className="text-sm text-muted-foreground max-w-md">Inicie uma conversa com este cliente.</p>
+          </div>
+        </div>
       </div>
     )
   }

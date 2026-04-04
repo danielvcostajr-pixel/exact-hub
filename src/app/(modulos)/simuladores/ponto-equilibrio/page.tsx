@@ -101,16 +101,16 @@ interface ResultadoUnidades {
 export default function PontoEquilibrioPage() {
   const { clienteAtivo, isFiltered } = useClienteContext()
   // ── Tab Financeiro state ──────────────────────────────────────────────────
-  const [custosFixos, setCustosFixos] = useState<string>('80000')
-  const [custosVariaveis, setCustosVariaveis] = useState<string>('40')
-  const [faturamentoAtual, setFaturamentoAtual] = useState<string>('150000')
+  const [custosFixos, setCustosFixos] = useState<string>('')
+  const [custosVariaveis, setCustosVariaveis] = useState<string>('')
+  const [faturamentoAtual, setFaturamentoAtual] = useState<string>('')
   const [importarProjecao, setImportarProjecao] = useState(false)
   const [resultadoFin, setResultadoFin] = useState<ResultadoFinanceiro | null>(null)
 
   // ── Tab Unidades state ────────────────────────────────────────────────────
-  const [custosFixosU, setCustosFixosU] = useState<string>('50000')
-  const [precoUnitario, setPrecoUnitario] = useState<string>('250')
-  const [custoVariavelU, setCustoVariavelU] = useState<string>('120')
+  const [custosFixosU, setCustosFixosU] = useState<string>('')
+  const [precoUnitario, setPrecoUnitario] = useState<string>('')
+  const [custoVariavelU, setCustoVariavelU] = useState<string>('')
   const [resultadoUni, setResultadoUni] = useState<ResultadoUnidades | null>(null)
 
   // ── saved alert ──────────────────────────────────────────────────────────

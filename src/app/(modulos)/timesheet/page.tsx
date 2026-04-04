@@ -63,40 +63,13 @@ interface TimeEntry {
 
 type ReportRange = "esta-semana" | "este-mes" | "mes-passado" | "personalizado"
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+// ─── Data ────────────────────────────────────────────────────────────────
 
-const CLIENTS = [
-  "Geny Eletros",
-  "Casa Gramado",
-  "Alumifont",
-  "Confort Maison",
-  "Pizzaria Bella",
-  "Tech Solutions",
-  "Farmacia Popular",
-  "Auto Center JP",
-]
+const CLIENTS: string[] = []
 
-const PLANNED_HOURS: Record<string, number> = {
-  "Geny Eletros":    20,
-  "Casa Gramado":    16,
-  "Alumifont":       12,
-  "Confort Maison":  10,
-  "Pizzaria Bella":  8,
-  "Tech Solutions":  18,
-  "Farmacia Popular":14,
-  "Auto Center JP":  6,
-}
+const PLANNED_HOURS: Record<string, number> = {}
 
-const RATE_PER_HOUR: Record<string, number> = {
-  "Geny Eletros":    250,
-  "Casa Gramado":    200,
-  "Alumifont":       300,
-  "Confort Maison":  220,
-  "Pizzaria Bella":  180,
-  "Tech Solutions":  280,
-  "Farmacia Popular":210,
-  "Auto Center JP":  190,
-}
+const RATE_PER_HOUR: Record<string, number> = {}
 
 const today = new Date()
 const fmtDate = (dt: Date) => dt.toLocaleDateString("pt-BR")
@@ -106,28 +79,7 @@ const dayOffset = (n: number) => {
   return fmtDate(d)
 }
 
-const INITIAL_ENTRIES: TimeEntry[] = [
-  { id: "e1",  date: dayOffset(0),   client: "Geny Eletros",     activity: "Revisao de OKRs Q2",                  duration: 90,  type: "timer"  },
-  { id: "e2",  date: dayOffset(0),   client: "Farmacia Popular",  activity: "Entrevista com gerente",               duration: 60,  type: "timer"  },
-  { id: "e3",  date: dayOffset(-1),  client: "Casa Gramado",      activity: "Planejamento de rotinas",              duration: 75,  type: "timer"  },
-  { id: "e4",  date: dayOffset(-1),  client: "Tech Solutions",    activity: "Apresentacao de resultados",           duration: 120, type: "manual" },
-  { id: "e5",  date: dayOffset(-2),  client: "Alumifont",         activity: "Canvas de negocio — revisao",          duration: 90,  type: "timer"  },
-  { id: "e6",  date: dayOffset(-2),  client: "Geny Eletros",      activity: "Analise de projecao financeira",       duration: 105, type: "timer"  },
-  { id: "e7",  date: dayOffset(-3),  client: "Confort Maison",    activity: "Reuniao de acompanhamento mensal",     duration: 60,  type: "manual" },
-  { id: "e8",  date: dayOffset(-3),  client: "Farmacia Popular",  activity: "Mapeamento de processos",              duration: 90,  type: "timer"  },
-  { id: "e9",  date: dayOffset(-4),  client: "Casa Gramado",      activity: "OKR workshop com diretoria",           duration: 180, type: "timer"  },
-  { id: "e10", date: dayOffset(-4),  client: "Pizzaria Bella",    activity: "Diagnostico inicial",                  duration: 60,  type: "manual" },
-  { id: "e11", date: dayOffset(-5),  client: "Tech Solutions",    activity: "Revisao de planos de acao",            duration: 90,  type: "timer"  },
-  { id: "e12", date: dayOffset(-5),  client: "Geny Eletros",      activity: "Alinhamento com lideranca",            duration: 60,  type: "timer"  },
-  { id: "e13", date: dayOffset(-6),  client: "Auto Center JP",    activity: "Entrevista de diagnostico",            duration: 45,  type: "timer"  },
-  { id: "e14", date: dayOffset(-7),  client: "Alumifont",         activity: "Revisao de canvas",                   duration: 75,  type: "manual" },
-  { id: "e15", date: dayOffset(-8),  client: "Confort Maison",    activity: "Entrega de relatorio de resultados",   duration: 30,  type: "timer"  },
-  { id: "e16", date: dayOffset(-8),  client: "Farmacia Popular",  activity: "Plano de acao — segunda etapa",       duration: 90,  type: "manual" },
-  { id: "e17", date: dayOffset(-9),  client: "Geny Eletros",      activity: "Planejamento estrategico Q3",          duration: 120, type: "timer"  },
-  { id: "e18", date: dayOffset(-9),  client: "Tech Solutions",    activity: "Canvas de negocio — sessao 2",         duration: 90,  type: "timer"  },
-  { id: "e19", date: dayOffset(-10), client: "Casa Gramado",      activity: "Entrevistas com equipe operacional",   duration: 120, type: "timer"  },
-  { id: "e20", date: dayOffset(-11), client: "Pizzaria Bella",    activity: "Revisao de metas mensais",             duration: 45,  type: "manual" },
-]
+const INITIAL_ENTRIES: TimeEntry[] = []
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

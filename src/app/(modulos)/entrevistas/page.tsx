@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Plus, ClipboardList, MessageSquare, BarChart3, Eye, Send, CheckCircle, FileText, ArrowLeft } from 'lucide-react'
 import { useClienteContext } from '@/hooks/useClienteContext'
+import { getEntrevistasByEmpresa } from '@/lib/api/data-service'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -11,101 +12,6 @@ import { FormQuestionario } from '@/components/entrevistas/FormQuestionario'
 import { RespostaCard } from '@/components/entrevistas/RespostaCard'
 import { AnalisePareto } from '@/components/entrevistas/AnalisePareto'
 import { Entrevista, RespostaEntrevista, StatusEntrevista } from '@/types'
-
-// Mock data
-const ENTREVISTAS_MOCK: Entrevista[] = [
-  {
-    id: 'ent-1',
-    empresaId: 'emp-1',
-    titulo: 'Diagnostico Organizacional Q1 2025',
-    descricao: 'Mapeamento dos processos e alinhamento estrategico da equipe de lideranca.',
-    status: 'ANALISADA',
-    perguntas: [
-      { id: 'p1', texto: 'Como voce avalia a clareza dos processos internos?', categoria: 'Processos', tipo: 'escala' },
-      { id: 'p2', texto: 'Quais sao os principais gargalos de produtividade?', categoria: 'Processos', tipo: 'aberta' },
-      { id: 'p3', texto: 'O quanto a equipe esta alinhada com os objetivos estrategicos?', categoria: 'Estrategia', tipo: 'escala' },
-      { id: 'p4', texto: 'Como avalia as ferramentas tecnologicas disponíveis?', categoria: 'Tecnologia', tipo: 'escala' },
-    ],
-    analise: {
-      resumoExecutivo:
-        'A analise de 8 entrevistas revelou que gestao de processos e comunicacao interna concentram 67% das queixas, configurando os pontos criticos prioritarios. A lideranca e vista positivamente por 85% dos respondentes.',
-      temas: [
-        { tema: 'Gestao de Processos', frequencia: 7, percentual: 29.2, acumulado: 29.2, categoria: 'Processos' },
-        { tema: 'Comunicacao Interna', frequencia: 5, percentual: 20.8, acumulado: 50.0, categoria: 'Pessoas' },
-        { tema: 'Tecnologia Desatualizada', frequencia: 4, percentual: 16.7, acumulado: 66.7, categoria: 'Tecnologia' },
-        { tema: 'Metas Pouco Claras', frequencia: 3, percentual: 12.5, acumulado: 79.2, categoria: 'Estrategia' },
-        { tema: 'Treinamento Insuficiente', frequencia: 3, percentual: 12.5, acumulado: 91.7, categoria: 'Pessoas' },
-        { tema: 'Outros', frequencia: 2, percentual: 8.3, acumulado: 100, categoria: 'Outros' },
-      ],
-      pontosCriticos: [
-        'Falta de padronizacao nos processos operacionais — cada gestor adota praticas diferentes',
-        'Comunicacao entre setores e fragil, gerando retrabalho e perda de informacoes',
-        'Sistema ERP desatualizado compromete a agilidade operacional',
-      ],
-      pontosPositivos: [
-        'Lideranca e reconhecida como acessivel e engajada pela maioria dos colaboradores',
-        'Cultura de comprometimento com o cliente e forte em toda a organizacao',
-        'Equipe demonstra alto potencial de adaptacao a mudancas',
-      ],
-      recomendacoes: [
-        'Mapear e padronizar os 5 processos mais criticos nos proximos 90 dias',
-        'Implementar reunioes semanais de alinhamento entre areas (Daily de 15min)',
-        'Avaliar upgrade do ERP ou integracao com ferramentas complementares',
-        'Criar programa de treinamento trimestral com foco em processos e tecnologia',
-      ],
-    },
-    criadoPorId: 'usr-1',
-  },
-  {
-    id: 'ent-2',
-    empresaId: 'emp-1',
-    titulo: 'Pesquisa de Clima — Equipe de Vendas',
-    descricao: 'Avaliacao do ambiente de trabalho e satisfacao da equipe comercial.',
-    status: 'ATIVA',
-    perguntas: [
-      { id: 'p5', texto: 'Como voce avalia seu nivel de satisfacao no trabalho?', categoria: 'Pessoas', tipo: 'escala' },
-      { id: 'p6', texto: 'Voce tem as ferramentas necessarias para atingir suas metas?', categoria: 'Tecnologia', tipo: 'multipla_escolha', opcoes: ['Sim, totalmente', 'Parcialmente', 'Nao'] },
-      { id: 'p7', texto: 'O que pode ser melhorado no processo de vendas?', categoria: 'Processos', tipo: 'aberta' },
-    ],
-    criadoPorId: 'usr-1',
-  },
-  {
-    id: 'ent-3',
-    empresaId: 'emp-1',
-    titulo: 'Mapeamento de Competencias — Gerencias',
-    descricao: 'Identificacao de gaps de competencia entre os gestores de nivel gerencial.',
-    status: 'RASCUNHO',
-    perguntas: [],
-    criadoPorId: 'usr-1',
-  },
-]
-
-const RESPOSTAS_MOCK: RespostaEntrevista[] = [
-  {
-    id: 'res-1',
-    entrevistaId: 'ent-1',
-    respondente: 'Carlos Mendes',
-    cargo: 'Gerente de Operacoes',
-    area: 'Operacoes',
-    respostas: { p1: 4, p2: 'O maior gargalo e a falta de um processo padronizado para entrada de pedidos. Cada loja faz de um jeito diferente.', p3: 6, p4: 3 },
-  },
-  {
-    id: 'res-2',
-    entrevistaId: 'ent-1',
-    respondente: 'Ana Paula Rocha',
-    cargo: 'Coordenadora Financeira',
-    area: 'Financeiro',
-    respostas: { p1: 6, p2: 'A comunicacao entre vendas e financeiro e muito falha. Recebo fechamentos com dados errados frequentemente.', p3: 7, p4: 5 },
-  },
-  {
-    id: 'res-3',
-    entrevistaId: 'ent-1',
-    respondente: 'Roberto Lima',
-    cargo: 'Supervisor de Vendas',
-    area: 'Comercial',
-    respostas: { p1: 5, p2: 'Nao temos um CRM adequado. Usamos planilhas que frequentemente se perdem ou ficam desatualizadas.', p3: 8, p4: 4 },
-  },
-]
 
 const STATUS_CONFIG: Record<StatusEntrevista, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
   RASCUNHO: { label: 'Rascunho', color: '#B0B0B0', bg: '#1A1C1E', icon: <FileText size={10} /> },
@@ -116,11 +22,24 @@ const STATUS_CONFIG: Record<StatusEntrevista, { label: string; color: string; bg
 
 export default function EntrevistasPage() {
   const { clienteAtivo, isFiltered } = useClienteContext()
-  const [entrevistas, setEntrevistas] = useState<Entrevista[]>(ENTREVISTAS_MOCK)
-  const [respostas] = useState<RespostaEntrevista[]>(RESPOSTAS_MOCK)
+  const [entrevistas, setEntrevistas] = useState<Entrevista[]>([])
+  const [respostas] = useState<RespostaEntrevista[]>([])
   const [formOpen, setFormOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('questionarios')
-  const [analiseAtiva, setAnaliseAtiva] = useState<string | null>('ent-1')
+  const [analiseAtiva, setAnaliseAtiva] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (clienteAtivo) {
+      setLoading(true)
+      getEntrevistasByEmpresa(clienteAtivo.id)
+        .then((data) => {
+          setEntrevistas(data as unknown as Entrevista[])
+        })
+        .catch(() => setEntrevistas([]))
+        .finally(() => setLoading(false))
+    }
+  }, [clienteAtivo])
 
   function handleSaveEntrevista(entrevista: Entrevista) {
     setEntrevistas((prev) => [entrevista, ...prev])
@@ -137,6 +56,49 @@ export default function EntrevistasPage() {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
         <p className="text-muted-foreground">Selecione um cliente no seletor acima para visualizar os dados.</p>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    )
+  }
+
+  if (entrevistas.length === 0) {
+    return (
+      <div className="flex flex-col gap-5 p-6 min-h-screen bg-background">
+        <div className="flex items-center gap-3">
+          <Link href="/consultor" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft size={16} />
+            Voltar
+          </Link>
+          {clienteAtivo && (
+            <span className="text-sm text-primary font-medium">{clienteAtivo.nome}</span>
+          )}
+        </div>
+        <div className="flex flex-col items-center justify-center py-16 gap-4">
+          <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
+            <ClipboardList size={24} className="text-muted-foreground" />
+          </div>
+          <div className="text-center">
+            <h3 className="text-lg font-semibold text-foreground mb-1">Nenhuma entrevista realizada</h3>
+            <p className="text-sm text-muted-foreground max-w-md">Crie a primeira entrevista para este cliente.</p>
+          </div>
+          <Button onClick={() => setFormOpen(true)} className="gradient-exact text-white mt-2">
+            <Plus size={16} />
+            Criar Primeira Entrevista
+          </Button>
+        </div>
+        <FormQuestionario
+          open={formOpen}
+          onClose={() => setFormOpen(false)}
+          onSave={handleSaveEntrevista}
+          empresaId={clienteAtivo?.id ?? ''}
+        />
       </div>
     )
   }
@@ -348,7 +310,7 @@ export default function EntrevistasPage() {
         open={formOpen}
         onClose={() => setFormOpen(false)}
         onSave={handleSaveEntrevista}
-        empresaId="emp-1"
+        empresaId={clienteAtivo?.id ?? ''}
       />
     </div>
   )

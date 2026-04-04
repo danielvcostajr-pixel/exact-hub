@@ -26,62 +26,6 @@ interface Relatorio {
   proximaSemana: string[]
 }
 
-const mockRelatorios: Relatorio[] = [
-  {
-    id: "1",
-    semanaInicio: "2026-03-24",
-    semanaFim: "2026-03-28",
-    status: "finalizado",
-    resumoExecutivo:
-      "Semana produtiva com foco na entrega do modulo de analytics para a Geny Eletrodomesticos. As principais metas foram atingidas e o dashboard de vendas foi aprovado pelo cliente. Pequenos ajustes de layout foram solicitados e serao entregues na proxima iteracao.",
-    tarefasConcluidas: [
-      { titulo: "Dashboard de vendas — Geny (aprovado pelo cliente)", status: "concluida" },
-      { titulo: "Mapeamento de processos logisticos — TechVision", status: "concluida" },
-      { titulo: "Relatorio mensal de marco — Nordeste Distribuidora", status: "concluida" },
-      { titulo: "Configuracao do ambiente de staging", status: "concluida" },
-    ],
-    tarefasAndamento: [
-      { titulo: "Integracao API ClickUp — modulo de tarefas", status: "andamento" },
-      { titulo: "Revisao dos OKRs — TechVision (aguardando feedback)", status: "andamento" },
-    ],
-    problemas: [
-      "Atraso na entrega de dados pela equipe financeira da Geny — impacto de 2 dias no cronograma",
-      "Ambiente de producao da TechVision indisponivel na quarta-feira — reuniao reagendada",
-    ],
-    proximaSemana: [
-      "Finalizar integracao ClickUp e iniciar testes",
-      "Workshop de processos TechVision — dia 15/04",
-      "Revisao dos KPIs do Q2 com equipe interna",
-      "Entrega dos ajustes do dashboard Geny",
-    ],
-  },
-  {
-    id: "2",
-    semanaInicio: "2026-03-17",
-    semanaFim: "2026-03-21",
-    status: "finalizado",
-    resumoExecutivo:
-      "Semana dedicada ao kick-off de novos projetos e levantamento de requisitos. Tres novas empresas iniciaram processo de onboarding. O modulo de entrevistas foi utilizado com sucesso para estruturar o diagnostico inicial da Nordeste Distribuidora.",
-    tarefasConcluidas: [
-      { titulo: "Kick-off Projeto Analytics — equipe completa presente", status: "concluida" },
-      { titulo: "Entrevistas de diagnostico — Nordeste Distribuidora (6 entrevistados)", status: "concluida" },
-      { titulo: "Proposta comercial — novo cliente (aguardando assinatura)", status: "concluida" },
-    ],
-    tarefasAndamento: [
-      { titulo: "Analise dos dados de entrevistas — Nordeste", status: "andamento" },
-      { titulo: "Desenvolvimento dashboard vendas — Geny", status: "andamento" },
-    ],
-    problemas: [
-      "Dificuldade no acesso aos dados historicos da Nordeste — solicitando apoio do TI deles",
-    ],
-    proximaSemana: [
-      "Concluir analise de entrevistas Nordeste",
-      "Primeira versao do dashboard Geny para aprovacao",
-      "Mapeamento de processos TechVision",
-    ],
-  },
-]
-
 function formatWeek(inicio: string, fim: string) {
   const fmtDate = (d: string) =>
     new Date(d + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
@@ -238,7 +182,7 @@ function RelatorioCard({ relatorio }: { relatorio: Relatorio }) {
 
 export default function RelatoriosPage() {
   const { clienteAtivo, isFiltered } = useClienteContext()
-  const [relatorios] = useState<Relatorio[]>(mockRelatorios)
+  const [relatorios] = useState<Relatorio[]>([])
 
   if (!isFiltered) {
     return (
@@ -283,10 +227,18 @@ export default function RelatoriosPage() {
         </div>
 
         {relatorios.length === 0 && (
-          <div className="text-center py-16 text-muted-foreground">
-            <FileText className="size-10 mx-auto mb-3 opacity-40" />
-            <p className="text-sm">Nenhum relatorio registrado ainda</p>
-            <p className="text-xs mt-1">Crie seu primeiro relatorio semanal</p>
+          <div className="flex flex-col items-center justify-center py-16 gap-4">
+            <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
+              <FileText size={24} className="text-muted-foreground" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-foreground mb-1">Nenhum relatorio gerado</h3>
+              <p className="text-sm text-muted-foreground max-w-md">Crie o primeiro relatorio semanal para este cliente.</p>
+            </div>
+            <Button className="gradient-exact text-white mt-2">
+              <Plus className="size-4" />
+              Criar Primeiro Relatorio
+            </Button>
           </div>
         )}
       </div>
