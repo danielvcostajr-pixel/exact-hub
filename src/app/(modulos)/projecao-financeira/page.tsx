@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import Link from 'next/link'
+import { useClienteContext } from '@/hooks/useClienteContext'
 import type {
   ProjecaoFinanceiraCompleta,
   ResultadoProfecia,
@@ -38,6 +40,7 @@ import {
   SlidersHorizontal,
   PlayCircle,
   ChevronRight,
+  ArrowLeft,
 } from 'lucide-react'
 
 // ============================================================
@@ -168,6 +171,7 @@ interface ResultadosCalculados {
 // ============================================================
 
 export default function ProjecaoFinanceiraPage() {
+  const { clienteAtivo, isFiltered } = useClienteContext()
   const [dados, setDados] = useState<ProjecaoFinanceiraCompleta>(ESTADO_INICIAL)
   const [anoBase, setAnoBase] = useState(ANO_BASE_DEFAULT)
   const anoProjecao = anoBase + 1
@@ -449,13 +453,33 @@ export default function ProjecaoFinanceiraPage() {
   }
 
   // ── Render ───────────────────────────────────────────────────
+
+  if (!isFiltered) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3 p-6">
+        <p className="text-muted-foreground">Selecione um cliente no seletor acima para visualizar os dados.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
       <div className="border-b border-border px-6 py-4">
+        <div className="flex items-center gap-3 mb-2">
+          <Link href="/consultor" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft size={16} />
+            Voltar
+          </Link>
+          {clienteAtivo && (
+            <span className="text-sm text-primary font-medium">
+              {clienteAtivo.nome}
+            </span>
+          )}
+        </div>
         <h1 className="text-lg font-bold text-foreground">Projecao Financeira — 12 Meses</h1>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Modelo PROFECIA — Confort Maison · {anoProjecao}
+          Modelo PROFECIA — {clienteAtivo?.nome ?? 'Cliente'} · {anoProjecao}
         </p>
       </div>
 

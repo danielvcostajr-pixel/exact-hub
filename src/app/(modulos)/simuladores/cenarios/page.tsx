@@ -10,6 +10,7 @@ import {
   Trash2,
   TrendingUp,
 } from 'lucide-react'
+import { useClienteContext } from '@/hooks/useClienteContext'
 import {
   LineChart,
   Line,
@@ -156,6 +157,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CenariosPage() {
+  const { clienteAtivo, isFiltered } = useClienteContext()
   const [base, setBase] = useState<BaseData>(BASE_DEFAULT)
   const [cenarios, setCenarios] = useState<Cenario[]>(CENARIOS_DEFAULT)
   const [resultados, setResultados] = useState<CenarioResult[] | null>(null)
@@ -213,6 +215,14 @@ export default function CenariosPage() {
   const getBorderCor = (id: string) =>
     borderCorMap[id] ?? 'border-purple-400'
 
+  if (!isFiltered) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <p className="text-muted-foreground">Selecione um cliente no seletor acima para visualizar os dados.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
@@ -226,6 +236,12 @@ export default function CenariosPage() {
             Simuladores
           </Link>
           <span className="text-muted-foreground/40">/</span>
+          {clienteAtivo && (
+            <>
+              <span className="text-sm text-primary font-medium">{clienteAtivo.nome}</span>
+              <span className="text-muted-foreground/40">/</span>
+            </>
+          )}
           <div className="flex items-center gap-2">
             <TrendingUp size={18} className="text-green-500" />
             <h1 className="text-xl font-bold text-foreground">Cenarios Financeiros</h1>

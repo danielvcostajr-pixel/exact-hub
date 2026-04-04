@@ -1,24 +1,14 @@
 'use client'
 
-import { useState } from 'react'
-import { Save, RotateCcw, ChevronDown, GitBranch } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
+import { Save, RotateCcw, GitBranch, ArrowLeft, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import { CanvasBoard } from '@/components/canvas/CanvasBoard'
 import { BlocoCanvas, BusinessModelCanvasData, CanvasCard } from '@/types'
-
-// Mock companies
-const EMPRESAS = [
-  { id: 'emp-1', nome: 'Geny Eletrodomesticos' },
-  { id: 'emp-2', nome: 'TechSol Sistemas' },
-  { id: 'emp-3', nome: 'Construmax Engenharia' },
-]
+import { useClienteContext } from '@/hooks/useClienteContext'
+import { getCanvasByEmpresa, saveCanvas } from '@/lib/api/data-service'
 
 function gerarId() {
   return Math.random().toString(36).substring(2, 10)
@@ -42,125 +32,147 @@ function canvasVazio(empresaId: string): BusinessModelCanvasData {
   }
 }
 
-const CANVAS_DEMO: BusinessModelCanvasData = {
-  empresaId: 'emp-1',
-  versao: 1,
-  blocos: {
-    parceiros: [
-      { id: gerarId(), texto: 'Fornecedores de eletrodomésticos', cor: '#8B5CF6', ordem: 0 },
-      { id: gerarId(), texto: 'Transportadoras logísticas', cor: '#8B5CF6', ordem: 1 },
-      { id: gerarId(), texto: 'Financeiras parceiras', cor: '#8B5CF6', ordem: 2 },
-    ],
-    atividades: [
-      { id: gerarId(), texto: 'Venda e atendimento ao cliente', cor: '#3B82F6', ordem: 0 },
-      { id: gerarId(), texto: 'Gestão de estoque', cor: '#3B82F6', ordem: 1 },
-      { id: gerarId(), texto: 'Entrega e instalação', cor: '#3B82F6', ordem: 2 },
-    ],
-    recursos: [
-      { id: gerarId(), texto: 'Lojas físicas (12 unidades)', cor: '#06B6D4', ordem: 0 },
-      { id: gerarId(), texto: 'Equipe de vendas treinada', cor: '#06B6D4', ordem: 1 },
-      { id: gerarId(), texto: 'Sistema ERP', cor: '#06B6D4', ordem: 2 },
-    ],
-    proposta: [
-      { id: gerarId(), texto: 'Melhor preço da região com garantia estendida', cor: '#F17522', ordem: 0 },
-      { id: gerarId(), texto: 'Entrega e instalação grátis', cor: '#F17522', ordem: 1 },
-      { id: gerarId(), texto: 'Crédito facilitado para todos os perfis', cor: '#F17522', ordem: 2 },
-    ],
-    relacionamento: [
-      { id: gerarId(), texto: 'Atendimento presencial humanizado', cor: '#10B981', ordem: 0 },
-      { id: gerarId(), texto: 'Pós-venda via WhatsApp', cor: '#10B981', ordem: 1 },
-    ],
-    canais: [
-      { id: gerarId(), texto: 'Lojas físicas na Paraíba', cor: '#F59E0B', ordem: 0 },
-      { id: gerarId(), texto: 'E-commerce próprio', cor: '#F59E0B', ordem: 1 },
-      { id: gerarId(), texto: 'Marketplaces (Mercado Livre)', cor: '#F59E0B', ordem: 2 },
-    ],
-    segmentos: [
-      { id: gerarId(), texto: 'Famílias classe B/C', cor: '#EF4444', ordem: 0 },
-      { id: gerarId(), texto: 'Pequenos empreendedores', cor: '#EF4444', ordem: 1 },
-      { id: gerarId(), texto: 'Construtoras e imobiliárias', cor: '#EF4444', ordem: 2 },
-    ],
-    custos: [
-      { id: gerarId(), texto: 'Aluguel das lojas (R$ 280k/mês)', cor: '#EC4899', ordem: 0 },
-      { id: gerarId(), texto: 'Folha de pagamento', cor: '#EC4899', ordem: 1 },
-      { id: gerarId(), texto: 'Compra de estoque', cor: '#EC4899', ordem: 2 },
-      { id: gerarId(), texto: 'Logística e frete', cor: '#EC4899', ordem: 3 },
-    ],
-    receitas: [
-      { id: gerarId(), texto: 'Venda de eletrodomésticos (principal)', cor: '#10B981', ordem: 0 },
-      { id: gerarId(), texto: 'Garantia estendida e seguros', cor: '#10B981', ordem: 1 },
-      { id: gerarId(), texto: 'Serviço de instalação', cor: '#10B981', ordem: 2 },
-    ],
-  },
-}
-
 export default function CanvasNegocioPage() {
-  const [empresaSelecionada, setEmpresaSelecionada] = useState(EMPRESAS[0])
-  const [canvas, setCanvas] = useState<BusinessModelCanvasData>(CANVAS_DEMO)
+  const { clienteAtivo, isFiltered } = useClienteContext()
+  const [canvas, setCanvas] = useState<BusinessModelCanvasData | null>(null)
   const [versao, setVersao] = useState(1)
   const [salvando, setSalvando] = useState(false)
+  const [carregando, setCarregando] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
 
+  // Load canvas from Supabase when client changes
+  const loadCanvas = useCallback(async (empresaId: string) => {
+    setCarregando(true)
+    setSavedAt(null)
+    try {
+      const data = await getCanvasByEmpresa(empresaId)
+      if (data && data.blocos) {
+        setCanvas({
+          empresaId,
+          versao: data.versao || 1,
+          blocos: data.blocos as BusinessModelCanvasData['blocos'],
+        })
+        setVersao(data.versao || 1)
+      } else {
+        setCanvas(canvasVazio(empresaId))
+        setVersao(1)
+      }
+    } catch (err) {
+      console.error('Erro ao carregar canvas:', err)
+      setCanvas(canvasVazio(empresaId))
+      setVersao(1)
+    } finally {
+      setCarregando(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (clienteAtivo) {
+      loadCanvas(clienteAtivo.id)
+    } else {
+      setCanvas(null)
+    }
+  }, [clienteAtivo, loadCanvas])
+
   function handleAddCard(bloco: BlocoCanvas) {
+    if (!canvas) return
     const novoCard: CanvasCard = {
       id: gerarId(),
       texto: 'Nova ideia...',
       ordem: canvas.blocos[bloco].length,
     }
-    setCanvas((prev) => ({
+    setCanvas((prev) => prev ? ({
       ...prev,
       blocos: {
         ...prev.blocos,
         [bloco]: [...prev.blocos[bloco], novoCard],
       },
-    }))
+    }) : prev)
   }
 
   function handleUpdateCard(bloco: BlocoCanvas, id: string, texto: string) {
-    setCanvas((prev) => ({
+    setCanvas((prev) => prev ? ({
       ...prev,
       blocos: {
         ...prev.blocos,
         [bloco]: prev.blocos[bloco].map((c) => (c.id === id ? { ...c, texto } : c)),
       },
-    }))
+    }) : prev)
   }
 
   function handleRemoveCard(bloco: BlocoCanvas, id: string) {
-    setCanvas((prev) => ({
+    setCanvas((prev) => prev ? ({
       ...prev,
       blocos: {
         ...prev.blocos,
         [bloco]: prev.blocos[bloco].filter((c) => c.id !== id),
       },
-    }))
+    }) : prev)
   }
 
-  function handleSave() {
+  async function handleSave() {
+    if (!canvas || !clienteAtivo) return
     setSalvando(true)
-    setTimeout(() => {
-      setSalvando(false)
+    try {
+      await saveCanvas(clienteAtivo.id, canvas.blocos as unknown as Record<string, unknown>)
       setSavedAt(new Date().toLocaleTimeString('pt-BR'))
-    }, 800)
+    } catch (err) {
+      console.error('Erro ao salvar canvas:', err)
+    } finally {
+      setSalvando(false)
+    }
   }
 
   function handleNovaVersao() {
     const novaVersao = versao + 1
     setVersao(novaVersao)
-    setCanvas((prev) => ({ ...prev, versao: novaVersao }))
+    setCanvas((prev) => prev ? ({ ...prev, versao: novaVersao }) : prev)
     setSavedAt(null)
   }
 
   function handleReset() {
-    setCanvas(canvasVazio(empresaSelecionada.id))
+    if (!clienteAtivo) return
+    setCanvas(canvasVazio(clienteAtivo.id))
     setVersao(1)
     setSavedAt(null)
+  }
+
+  // No client selected
+  if (!isFiltered) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3 p-6">
+        <p className="text-muted-foreground">Selecione um cliente no seletor acima para visualizar os dados.</p>
+      </div>
+    )
+  }
+
+  // Loading
+  if (carregando || !canvas) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3 p-6">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">Carregando canvas...</p>
+      </div>
+    )
   }
 
   const totalCards = Object.values(canvas.blocos).reduce((sum, arr) => sum + arr.length, 0)
 
   return (
     <div className="flex flex-col gap-4 p-6 min-h-screen bg-background">
+      {/* Back button + client name */}
+      <div className="flex items-center gap-3">
+        <Link href="/consultor" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft size={16} />
+          Voltar
+        </Link>
+        {clienteAtivo && (
+          <span className="text-sm text-primary font-medium">
+            {clienteAtivo.nome}
+          </span>
+        )}
+      </div>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
@@ -171,30 +183,6 @@ export default function CanvasNegocioPage() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Company selector */}
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              className="flex items-center gap-1.5 rounded-md border border-border bg-card text-foreground hover:bg-secondary text-sm px-3 h-8 transition-colors"
-            >
-              {empresaSelecionada.nome}
-              <ChevronDown size={14} />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              className="border-border bg-card"
-              align="end"
-            >
-              {EMPRESAS.map((emp) => (
-                <DropdownMenuItem
-                  key={emp.id}
-                  onClick={() => setEmpresaSelecionada(emp)}
-                  className="text-foreground hover:bg-secondary cursor-pointer"
-                >
-                  {emp.nome}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
           {/* Version badge */}
           <div className="flex items-center gap-1.5">
             <Badge
@@ -205,7 +193,7 @@ export default function CanvasNegocioPage() {
               v{versao}
             </Badge>
             {savedAt && (
-              <span className="text-[11px] text-muted-foreground">Salvo às {savedAt}</span>
+              <span className="text-[11px] text-muted-foreground">Salvo as {savedAt}</span>
             )}
           </div>
 

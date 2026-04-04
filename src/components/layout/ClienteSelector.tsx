@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Users, ChevronDown, X, Search, Check } from "lucide-react"
-import { useClienteContext, CLIENTES_MOCK, ClienteInfo } from "@/hooks/useClienteContext"
+import { Users, ChevronDown, X, Search, Check, Loader2 } from "lucide-react"
+import { useClienteContext, ClienteInfo } from "@/hooks/useClienteContext"
 import { cn } from "@/lib/utils"
 
 const faseBadgeConfig: Record<string, string> = {
@@ -13,7 +13,7 @@ const faseBadgeConfig: Record<string, string> = {
 }
 
 export function ClienteSelector() {
-  const { clienteAtivo, setClienteAtivo, isFiltered } = useClienteContext()
+  const { clienteAtivo, setClienteAtivo, isFiltered, clientes, loading } = useClienteContext()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const containerRef = useRef<HTMLDivElement>(null)
@@ -50,7 +50,7 @@ export function ClienteSelector() {
     return () => document.removeEventListener("keydown", handleKey)
   }, [open])
 
-  const filtered = CLIENTES_MOCK.filter((c) =>
+  const filtered = clientes.filter((c) =>
     c.nome.toLowerCase().includes(query.toLowerCase()) ||
     c.fase.toLowerCase().includes(query.toLowerCase())
   )
@@ -76,7 +76,12 @@ export function ClienteSelector() {
         aria-expanded={open}
         aria-haspopup="listbox"
       >
-        {isFiltered && clienteAtivo ? (
+        {loading ? (
+          <>
+            <Loader2 className="size-3.5 animate-spin shrink-0" />
+            <span className="hidden sm:block">Carregando...</span>
+          </>
+        ) : isFiltered && clienteAtivo ? (
           <>
             {/* Active client avatar */}
             <span
@@ -164,7 +169,12 @@ export function ClienteSelector() {
 
             {/* Client list */}
             <div className="max-h-60 overflow-y-auto py-1">
-              {filtered.length === 0 ? (
+              {loading ? (
+                <div className="flex items-center justify-center gap-2 py-6">
+                  <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Carregando clientes...</span>
+                </div>
+              ) : filtered.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-4 px-3">
                   Nenhum cliente encontrado
                 </p>

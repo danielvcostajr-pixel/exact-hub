@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { Target, DollarSign, TrendingUp, PieChart, ArrowRight } from 'lucide-react'
+import { Target, DollarSign, TrendingUp, PieChart, ArrowRight, ArrowLeft } from 'lucide-react'
+import { useClienteContext } from '@/hooks/useClienteContext'
 
 const SIMULADORES = [
   {
@@ -39,8 +40,25 @@ const SIMULADORES = [
 ]
 
 export default function SimuladoresPage() {
+  const { clienteAtivo, isFiltered } = useClienteContext()
+
+  if (!isFiltered) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <p className="text-muted-foreground">Selecione um cliente no seletor acima para visualizar os dados.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-4xl mx-auto">
+      <div className="flex items-center gap-3 mb-4">
+        <Link href="/consultor" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft size={16} />
+          Voltar
+        </Link>
+        {clienteAtivo && <span className="text-sm text-primary font-medium">{clienteAtivo.nome}</span>}
+      </div>
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-foreground">Simuladores</h1>

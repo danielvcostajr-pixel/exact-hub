@@ -1,7 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Sparkles, Download, ChevronDown, Clock, RefreshCw } from 'lucide-react'
+import Link from 'next/link'
+import { Sparkles, Download, ChevronDown, Clock, RefreshCw, ArrowLeft } from 'lucide-react'
+import { useClienteContext } from '@/hooks/useClienteContext'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -165,6 +167,7 @@ const VERSOES = [
 ]
 
 export default function MemoriaClientePage() {
+  const { clienteAtivo, isFiltered } = useClienteContext()
   const [versaoAtual, setVersaoAtual] = useState(VERSOES[0])
   const [conteudo, setConteudo] = useState(MEMORIA_DEMO)
   const [gerando, setGerando] = useState(false)
@@ -194,8 +197,26 @@ export default function MemoriaClientePage() {
     setConteudo(versao.numero === 1 ? MEMORIA_SIMPLES : MEMORIA_DEMO)
   }
 
+  if (!isFiltered) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <p className="text-muted-foreground">Selecione um cliente no seletor acima para visualizar os dados.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-5 p-6 min-h-screen bg-background">
+      {/* Back + Client */}
+      <div className="flex items-center gap-3">
+        <Link href="/consultor" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft size={16} />
+          Voltar
+        </Link>
+        {clienteAtivo && (
+          <span className="text-sm text-primary font-medium">{clienteAtivo.nome}</span>
+        )}
+      </div>
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>

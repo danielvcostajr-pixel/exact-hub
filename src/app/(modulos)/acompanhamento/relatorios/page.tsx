@@ -1,7 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { FileText, Plus, ChevronDown, ChevronUp, CheckCircle2, Clock, AlertTriangle, ArrowRight, Calendar } from "lucide-react"
+import Link from "next/link"
+import { FileText, Plus, ChevronDown, ChevronUp, CheckCircle2, Clock, AlertTriangle, ArrowRight, Calendar, ArrowLeft } from "lucide-react"
+import { useClienteContext } from "@/hooks/useClienteContext"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
@@ -235,11 +237,27 @@ function RelatorioCard({ relatorio }: { relatorio: Relatorio }) {
 }
 
 export default function RelatoriosPage() {
+  const { clienteAtivo, isFiltered } = useClienteContext()
   const [relatorios] = useState<Relatorio[]>(mockRelatorios)
+
+  if (!isFiltered) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <p className="text-muted-foreground">Selecione um cliente no seletor acima para visualizar os dados.</p>
+      </div>
+    )
+  }
 
   return (
     <div className="h-full overflow-y-auto p-4 md:p-6 lg:p-8">
       <div className="max-w-4xl mx-auto space-y-6">
+        <div className="flex items-center gap-3">
+          <Link href="/consultor" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft size={16} />
+            Voltar
+          </Link>
+          {clienteAtivo && <span className="text-sm text-primary font-medium">{clienteAtivo.nome}</span>}
+        </div>
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>

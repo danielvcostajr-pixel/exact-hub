@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import Link from "next/link"
 import {
   List,
   LayoutGrid,
@@ -10,7 +11,9 @@ import {
   Search,
   SlidersHorizontal,
   X,
+  ArrowLeft,
 } from "lucide-react"
+import { useClienteContext } from "@/hooks/useClienteContext"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -47,6 +50,7 @@ const VIEWS: { id: ViewType; label: string; icon: React.ElementType }[] = [
 const RESPONSAVEIS = ["Daniel Vieira", "Ana Silva", "Carlos Mendes", "Roberto Lima"]
 
 export default function TarefasPage() {
+  const { clienteAtivo, isFiltered } = useClienteContext()
   const [tarefas, setTarefas] = useState<Tarefa[]>(MOCK_TAREFAS)
   const [activeView, setActiveView] = useState<ViewType>("lista")
   const [selectedTarefa, setSelectedTarefa] = useState<Tarefa | null>(null)
@@ -152,10 +156,25 @@ export default function TarefasPage() {
     return { total, emProgresso, concluidas, atrasadas }
   }, [tarefas])
 
+  if (!isFiltered) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <p className="text-muted-foreground">Selecione um cliente no seletor acima para visualizar os dados.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col h-full min-h-screen bg-background">
       {/* Page Header */}
       <div className="border-b border-border bg-card px-6 py-4 shrink-0">
+        <div className="flex items-center gap-3 mb-2">
+          <Link href="/consultor" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft size={16} />
+            Voltar
+          </Link>
+          {clienteAtivo && <span className="text-sm text-primary font-medium">{clienteAtivo.nome}</span>}
+        </div>
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Gestao de Tarefas</h1>

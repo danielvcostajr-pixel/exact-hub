@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react"
+import { getEmpresas } from "@/lib/api/data-service"
 
 export interface ClienteInfo {
   id: string
@@ -13,18 +14,9 @@ interface ClienteContextType {
   clienteAtivo: ClienteInfo | null
   setClienteAtivo: (cliente: ClienteInfo | null) => void
   isFiltered: boolean
+  clientes: ClienteInfo[]
+  loading: boolean
 }
-
-export const CLIENTES_MOCK: ClienteInfo[] = [
-  { id: "1", nome: "Alumifont",        initials: "AL", fase: "Diagnostico" },
-  { id: "2", nome: "Pizzaria Bella",   initials: "PB", fase: "Diagnostico" },
-  { id: "3", nome: "Auto Center JP",   initials: "AJ", fase: "Diagnostico" },
-  { id: "4", nome: "Casa Gramado",     initials: "CG", fase: "Planejamento" },
-  { id: "5", nome: "Tech Solutions",   initials: "TS", fase: "Planejamento" },
-  { id: "6", nome: "Geny Eletros",     initials: "GE", fase: "Execucao" },
-  { id: "7", nome: "Farmacia Popular", initials: "FP", fase: "Execucao" },
-  { id: "8", nome: "Confort Maison",   initials: "CM", fase: "Acompanhamento" },
-]
 
 const STORAGE_KEY = "exacthub_cliente_ativo"
 
@@ -32,26 +24,70 @@ const ClienteContext = createContext<ClienteContextType>({
   clienteAtivo: null,
   setClienteAtivo: () => {},
   isFiltered: false,
+  clientes: [],
+  loading: true,
 })
+
+function gerarInitials(nome: string): string {
+  const words = nome.trim().split(/\s+/)
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase()
+  }
+  return nome.substring(0, 2).toUpperCase()
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapEmpresaToCliente(empresa: any): ClienteInfo {
+  const nome = empresa.nomeFantasia || empresa.razaoSocial || "Sem nome"
+  return {
+    id: empresa.id,
+    nome,
+    initials: gerarInitials(nome),
+    fase: empresa.fase || "Diagnostico",
+  }
+}
 
 export function ClienteContextProvider({ children }: { children: ReactNode }) {
   const [clienteAtivo, setClienteAtivoState] = useState<ClienteInfo | null>(null)
+  const [clientes, setClientes] = useState<ClienteInfo[]>([])
+  const [loading, setLoading] = useState(true)
   const [hydrated, setHydrated] = useState(false)
 
-  // Restore persisted selection after mount (avoids SSR mismatch)
+  // Fetch real empresas from Supabase
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        const parsed: ClienteInfo = JSON.parse(stored)
-        // Validate the stored value still matches a known client
-        const valid = CLIENTES_MOCK.find((c) => c.id === parsed.id)
-        if (valid) setClienteAtivoState(valid)
+    let cancelled = false
+
+    async function fetchEmpresas() {
+      try {
+        const empresas = await getEmpresas()
+        if (!cancelled && empresas) {
+          const mapped = empresas.map(mapEmpresaToCliente)
+          setClientes(mapped)
+
+          // Restore persisted selection and validate against real list
+          try {
+            const stored = localStorage.getItem(STORAGE_KEY)
+            if (stored) {
+              const parsed: ClienteInfo = JSON.parse(stored)
+              const valid = mapped.find((c) => c.id === parsed.id)
+              if (valid) setClienteAtivoState(valid)
+            }
+          } catch {
+            // ignore malformed storage
+          }
+        }
+      } catch (err) {
+        console.error("Erro ao carregar empresas:", err)
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+          setHydrated(true)
+        }
       }
-    } catch {
-      // ignore malformed storage
     }
-    setHydrated(true)
+
+    fetchEmpresas()
+    return () => { cancelled = true }
   }, [])
 
   const setClienteAtivo = (cliente: ClienteInfo | null) => {
@@ -71,7 +107,7 @@ export function ClienteContextProvider({ children }: { children: ReactNode }) {
   if (!hydrated) {
     return (
       <ClienteContext.Provider
-        value={{ clienteAtivo: null, setClienteAtivo, isFiltered: false }}
+        value={{ clienteAtivo: null, setClienteAtivo, isFiltered: false, clientes: [], loading: true }}
       >
         {children}
       </ClienteContext.Provider>
@@ -84,6 +120,8 @@ export function ClienteContextProvider({ children }: { children: ReactNode }) {
         clienteAtivo,
         setClienteAtivo,
         isFiltered: clienteAtivo !== null,
+        clientes,
+        loading,
       }}
     >
       {children}

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import Link from "next/link"
 import {
   Play,
   Square,
@@ -15,7 +16,9 @@ import {
   TrendingUp,
   Users,
   Target,
+  ArrowLeft,
 } from "lucide-react"
+import { useClienteContext } from "@/hooks/useClienteContext"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -167,6 +170,7 @@ function EntryTypeIcon({ type }: { type: EntryType }) {
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function TimesheetPage() {
+  const { clienteAtivo, isFiltered } = useClienteContext()
   const [entries, setEntries] = useState<TimeEntry[]>(INITIAL_ENTRIES)
   const [activeTab, setActiveTab] = useState("registros")
 
@@ -377,8 +381,25 @@ export default function TimesheetPage() {
   // ── Today's timer sessions (entries registered today via timer) ────────────
   const todayEntries = entries.filter((e) => e.date === fmtDate(today) && e.type === "timer")
 
+  if (!isFiltered) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <p className="text-muted-foreground">Selecione um cliente no seletor acima para visualizar os dados.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
+
+      {/* Back + Client */}
+      <div className="flex items-center gap-3">
+        <Link href="/consultor" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft size={16} />
+          Voltar
+        </Link>
+        {clienteAtivo && <span className="text-sm text-primary font-medium">{clienteAtivo.nome}</span>}
+      </div>
 
       {/* Header */}
       <div>

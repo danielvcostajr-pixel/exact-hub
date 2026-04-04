@@ -1,7 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, ClipboardList, MessageSquare, BarChart3, Eye, Send, CheckCircle, FileText } from 'lucide-react'
+import Link from 'next/link'
+import { Plus, ClipboardList, MessageSquare, BarChart3, Eye, Send, CheckCircle, FileText, ArrowLeft } from 'lucide-react'
+import { useClienteContext } from '@/hooks/useClienteContext'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -113,6 +115,7 @@ const STATUS_CONFIG: Record<StatusEntrevista, { label: string; color: string; bg
 }
 
 export default function EntrevistasPage() {
+  const { clienteAtivo, isFiltered } = useClienteContext()
   const [entrevistas, setEntrevistas] = useState<Entrevista[]>(ENTREVISTAS_MOCK)
   const [respostas] = useState<RespostaEntrevista[]>(RESPOSTAS_MOCK)
   const [formOpen, setFormOpen] = useState(false)
@@ -130,8 +133,26 @@ export default function EntrevistasPage() {
 
   const entrevistaComAnalise = entrevistas.find((e) => e.id === analiseAtiva)
 
+  if (!isFiltered) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <p className="text-muted-foreground">Selecione um cliente no seletor acima para visualizar os dados.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-5 p-6 min-h-screen bg-background">
+      {/* Back + Client */}
+      <div className="flex items-center gap-3">
+        <Link href="/consultor" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft size={16} />
+          Voltar
+        </Link>
+        {clienteAtivo && (
+          <span className="text-sm text-primary font-medium">{clienteAtivo.nome}</span>
+        )}
+      </div>
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>

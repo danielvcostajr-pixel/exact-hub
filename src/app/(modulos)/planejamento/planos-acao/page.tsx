@@ -1,7 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, ListChecks, ChevronDown, ChevronUp, Link2, Users } from 'lucide-react'
+import Link from 'next/link'
+import { Plus, ListChecks, ChevronDown, ChevronUp, Link2, Users, ArrowLeft } from 'lucide-react'
+import { useClienteContext } from '@/hooks/useClienteContext'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -338,6 +340,7 @@ function PlanoCard({ plano }: { plano: PlanoAcao }) {
 }
 
 export default function PlanosAcaoPage() {
+  const { clienteAtivo, isFiltered } = useClienteContext()
   const [planos] = useState<PlanoAcao[]>(MOCK_PLANOS)
 
   const ativos = planos.filter((p) => p.status === 'Ativo').length
@@ -347,8 +350,23 @@ export default function PlanosAcaoPage() {
     0
   )
 
+  if (!isFiltered) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <p className="text-muted-foreground">Selecione um cliente no seletor acima para visualizar os dados.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex items-center gap-3">
+        <Link href="/consultor" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft size={16} />
+          Voltar
+        </Link>
+        {clienteAtivo && <span className="text-sm text-primary font-medium">{clienteAtivo.nome}</span>}
+      </div>
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import {
   Settings,
   CheckCircle2,
@@ -12,7 +13,9 @@ import {
   Globe,
   Zap,
   RefreshCw,
+  ArrowLeft,
 } from "lucide-react"
+import { useClienteContext } from "@/hooks/useClienteContext"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -99,6 +102,7 @@ function SyncCheckbox({
 }
 
 export default function ConfiguracoesPage() {
+  const { clienteAtivo } = useClienteContext()
   // ClickUp state
   const [clickup, setClickup] = useState<ClickUpConfig>({
     apiKey: "pk_12345678_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
@@ -150,6 +154,14 @@ export default function ConfiguracoesPage() {
   return (
     <DashboardLayout>
       <div className="max-w-3xl mx-auto space-y-8">
+        {/* Back + Client */}
+        <div className="flex items-center gap-3">
+          <Link href="/consultor" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft size={16} />
+            Voltar
+          </Link>
+          {clienteAtivo && <span className="text-sm text-primary font-medium">{clienteAtivo.nome}</span>}
+        </div>
         {/* Page Header */}
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2.5">

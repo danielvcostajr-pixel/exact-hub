@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Star,
 } from 'lucide-react'
+import { useClienteContext } from '@/hooks/useClienteContext'
 import {
   Card,
   CardContent,
@@ -83,6 +84,7 @@ const calcularSensibilidade = (
 // ─── component ──────────────────────────────────────────────────────────────
 
 export default function PrecificacaoPage() {
+  const { clienteAtivo, isFiltered } = useClienteContext()
   // Custos
   const [custoProduto, setCustoProduto] = useState<string>('85')
   const [custosFixosRateados, setCustosFixosRateados] = useState<string>('30')
@@ -173,6 +175,14 @@ export default function PrecificacaoPage() {
   // Render
   // ─────────────────────────────────────────────────────────────────────────
 
+  if (!isFiltered) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <p className="text-muted-foreground">Selecione um cliente no seletor acima para visualizar os dados.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* ── Header ── */}
@@ -185,6 +195,8 @@ export default function PrecificacaoPage() {
                 Voltar
               </Button>
             </Link>
+            <div className="h-5 w-px bg-border" />
+            {clienteAtivo && <span className="text-sm text-primary font-medium">{clienteAtivo.nome}</span>}
             <div className="h-5 w-px bg-border" />
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-orange-600">

@@ -1,7 +1,9 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Send, Paperclip, Search } from "lucide-react"
+import Link from "next/link"
+import { Send, Paperclip, Search, ArrowLeft } from "lucide-react"
+import { useClienteContext } from "@/hooks/useClienteContext"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
@@ -163,6 +165,7 @@ const mockConversations: Conversation[] = [
 ]
 
 export default function ChatPage() {
+  const { clienteAtivo, isFiltered } = useClienteContext()
   const [conversations] = useState<Conversation[]>(mockConversations)
   const [activeConversationId, setActiveConversationId] = useState<string>("1")
   const [messageInput, setMessageInput] = useState("")
@@ -184,8 +187,24 @@ export default function ChatPage() {
     c.company.toLowerCase().includes(search.toLowerCase())
   )
 
+  if (!isFiltered) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <p className="text-muted-foreground">Selecione um cliente no seletor acima para visualizar os dados.</p>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex h-full bg-background">
+    <div className="flex flex-col h-full bg-background">
+      <div className="flex items-center gap-3 p-4 border-b border-border">
+        <Link href="/consultor" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft size={16} />
+          Voltar
+        </Link>
+        {clienteAtivo && <span className="text-sm text-primary font-medium">{clienteAtivo.nome}</span>}
+      </div>
+      <div className="flex flex-1 overflow-hidden">
       {/* Conversation List */}
       <div className="w-72 shrink-0 flex flex-col border-r border-border bg-card">
         {/* Search */}
@@ -350,6 +369,7 @@ export default function ChatPage() {
           <p className="text-muted-foreground">Selecione uma conversa</p>
         </div>
       )}
+      </div>
     </div>
   )
 }

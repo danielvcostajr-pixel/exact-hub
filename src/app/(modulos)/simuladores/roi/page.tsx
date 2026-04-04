@@ -17,6 +17,7 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react'
+import { useClienteContext } from '@/hooks/useClienteContext'
 import {
   Area,
   XAxis,
@@ -205,6 +206,7 @@ const INPUT_DEFAULT: InputData = {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ROIPage() {
+  const { clienteAtivo, isFiltered } = useClienteContext()
   const [input, setInput] = useState<InputData>(INPUT_DEFAULT)
   const [resultado, setResultado] = useState<KPIResult | null>(null)
   const [calculado, setCalculado] = useState(false)
@@ -303,6 +305,14 @@ export default function ROIPage() {
     }
   })()
 
+  if (!isFiltered) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <p className="text-muted-foreground">Selecione um cliente no seletor acima para visualizar os dados.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
@@ -316,6 +326,12 @@ export default function ROIPage() {
             Simuladores
           </Link>
           <span className="text-muted-foreground/40">/</span>
+          {clienteAtivo && (
+            <>
+              <span className="text-sm text-primary font-medium">{clienteAtivo.nome}</span>
+              <span className="text-muted-foreground/40">/</span>
+            </>
+          )}
           <div className="flex items-center gap-2">
             <PieChart size={18} className="text-purple-500" />
             <h1 className="text-xl font-bold text-foreground">ROI de Investimentos</h1>

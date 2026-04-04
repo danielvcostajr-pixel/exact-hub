@@ -34,10 +34,10 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts"
-import { useClienteContext } from "@/hooks/useClienteContext"
+import { useClienteContext, ClienteInfo } from "@/hooks/useClienteContext"
 import { cn } from "@/lib/utils"
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────
 
 type Phase = "DIAGNOSTICO" | "PLANEJAMENTO" | "EXECUCAO" | "ACOMPANHAMENTO"
 
@@ -54,16 +54,26 @@ interface Client {
   okrConcluidos?: number
 }
 
-const mockClients: Client[] = [
-  { id: "1", name: "Alumifont",        initials: "AL", progress: 28, pendingItems: 7, lastActivity: "Hoje",         phase: "DIAGNOSTICO",    horasWeek: 2.0, okrTotal: 4, okrConcluidos: 1 },
-  { id: "2", name: "Pizzaria Bella",   initials: "PB", progress: 15, pendingItems: 5, lastActivity: "Ontem",        phase: "DIAGNOSTICO",    horasWeek: 1.5, okrTotal: 3, okrConcluidos: 0 },
-  { id: "3", name: "Auto Center JP",   initials: "AJ", progress: 10, pendingItems: 3, lastActivity: "3 dias atras", phase: "DIAGNOSTICO",    horasWeek: 1.0, okrTotal: 3, okrConcluidos: 0 },
-  { id: "4", name: "Casa Gramado",     initials: "CG", progress: 45, pendingItems: 6, lastActivity: "Hoje",         phase: "PLANEJAMENTO",   horasWeek: 3.5, okrTotal: 6, okrConcluidos: 2 },
-  { id: "5", name: "Tech Solutions",   initials: "TS", progress: 60, pendingItems: 4, lastActivity: "Ontem",        phase: "PLANEJAMENTO",   horasWeek: 3.0, okrTotal: 5, okrConcluidos: 3 },
-  { id: "6", name: "Geny Eletros",     initials: "GE", progress: 72, pendingItems: 2, lastActivity: "2 dias atras", phase: "EXECUCAO",       horasWeek: 6.5, okrTotal: 8, okrConcluidos: 5 },
-  { id: "7", name: "Farmacia Popular", initials: "FP", progress: 55, pendingItems: 4, lastActivity: "Hoje",         phase: "EXECUCAO",       horasWeek: 4.0, okrTotal: 6, okrConcluidos: 3 },
-  { id: "8", name: "Confort Maison",   initials: "CM", progress: 85, pendingItems: 1, lastActivity: "Ontem",        phase: "ACOMPANHAMENTO", horasWeek: 1.5, okrTotal: 7, okrConcluidos: 6 },
-]
+function mapClienteToClient(c: ClienteInfo): Client {
+  const faseMap: Record<string, Phase> = {
+    "Diagnostico": "DIAGNOSTICO",
+    "Planejamento": "PLANEJAMENTO",
+    "Execucao": "EXECUCAO",
+    "Acompanhamento": "ACOMPANHAMENTO",
+  }
+  return {
+    id: c.id,
+    name: c.nome,
+    initials: c.initials,
+    progress: 0,
+    pendingItems: 0,
+    lastActivity: "-",
+    phase: faseMap[c.fase] ?? "DIAGNOSTICO",
+    horasWeek: 0,
+    okrTotal: 0,
+    okrConcluidos: 0,
+  }
+}
 
 type Priority = "Alta" | "Media" | "Baixa"
 type TaskStatus = "Atrasada" | "Hoje" | "Esta Semana" | "Proxima Semana"
@@ -272,9 +282,11 @@ function TasksTable({ tasks }: { tasks: Task[] }) {
 // ─── Focused Client View ───────────────────────────────────────────────────────
 
 function ClientFocusedView({ clientId }: { clientId: string }) {
+  const { clientes } = useClienteContext()
   const [activeTab, setActiveTab] = useState<FocusTab>("visao-geral")
 
-  const client = mockClients.find((c) => c.id === clientId)
+  const clienteInfo = clientes.find((c) => c.id === clientId)
+  const client = clienteInfo ? mapClienteToClient(clienteInfo) : null
   if (!client) return null
 
   const cfg = phaseConfig[client.phase]
@@ -573,10 +585,12 @@ function ClientFocusedView({ clientId }: { clientId: string }) {
 // ─── Consolidated View ─────────────────────────────────────────────────────────
 
 function ConsolidatedView() {
+  const { clientes, loading } = useClienteContext()
   const [taskFilter, setTaskFilter] = useState<FilterKey>("Todas")
   const [timerRunning] = useState(true)
 
-  const totalClients    = mockClients.length
+  const pipelineClients = clientes.map(mapClienteToClient)
+  const totalClients    = pipelineClients.length
   const totalPending    = mockTasks.filter((t) => t.status !== "Proxima Semana").length
   const totalHorasWeek  = weeklyHours.reduce((s, h) => s + h.horas, 0)
   const reunioesWeek    = 3
@@ -610,7 +624,7 @@ function ConsolidatedView() {
       {/* ── KPI Cards ── */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {[
-          { label: "Clientes Ativos",    value: totalClients,              sub: "8 empresas ativas", icon: Building2,   iconColor: "text-blue-500",   iconBg: "bg-blue-500/10" },
+          { label: "Clientes Ativos",    value: totalClients,              sub: `${totalClients} empresas ativas`, icon: Building2,   iconColor: "text-blue-500",   iconBg: "bg-blue-500/10" },
           { label: "Tarefas Pendentes",  value: totalPending,              sub: "2 atrasadas",       icon: CheckSquare, iconColor: "text-red-500",    iconBg: "bg-red-500/10" },
           { label: "Horas Registradas",  value: `${totalHorasWeek.toFixed(1)}h`, sub: "esta semana", icon: Clock,       iconColor: "text-primary",    iconBg: "bg-primary/10" },
           { label: "Proximas Reunioes",  value: reunioesWeek,              sub: "esta semana",       icon: Calendar,    iconColor: "text-purple-500", iconBg: "bg-purple-500/10" },
@@ -648,10 +662,13 @@ function ConsolidatedView() {
           <span className="text-xs text-muted-foreground">{totalClients} clientes ativos</span>
         </CardHeader>
         <CardContent className="px-5 pb-5 pt-0">
+          {loading ? (
+            <p className="text-sm text-muted-foreground text-center py-8">Carregando clientes...</p>
+          ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             {phases.map((phase) => {
               const cfg = phaseConfig[phase]
-              const clients = mockClients.filter((c) => c.phase === phase)
+              const clients = pipelineClients.filter((c) => c.phase === phase)
               return (
                 <div
                   key={phase}
@@ -679,6 +696,7 @@ function ConsolidatedView() {
               )
             })}
           </div>
+          )}
         </CardContent>
       </Card>
 

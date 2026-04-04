@@ -1,7 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Target } from 'lucide-react'
+import Link from 'next/link'
+import { Plus, Target, ArrowLeft } from 'lucide-react'
+import { useClienteContext } from '@/hooks/useClienteContext'
 import { Button } from '@/components/ui/button'
 import { OKRCard, type OKR, type OKRStatus } from '@/components/planejamento/OKRCard'
 import { FormOKR, type OKRFormData } from '@/components/planejamento/FormOKR'
@@ -135,6 +137,7 @@ const MOCK_OKRS: OKR[] = [
 const STATUS_ORDER: OKRStatus[] = ['Ativo', 'Rascunho', 'Concluido', 'Cancelado']
 
 export default function OKRsPage() {
+  const { clienteAtivo, isFiltered } = useClienteContext()
   const [okrs, setOkrs] = useState<OKR[]>(MOCK_OKRS)
   const [formOpen, setFormOpen] = useState(false)
 
@@ -205,8 +208,26 @@ export default function OKRsPage() {
     (a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status)
   )
 
+  if (!isFiltered) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <p className="text-muted-foreground">Selecione um cliente no seletor acima para visualizar os dados.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-6">
+      {/* Back + Client */}
+      <div className="flex items-center gap-3">
+        <Link href="/consultor" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft size={16} />
+          Voltar
+        </Link>
+        {clienteAtivo && (
+          <span className="text-sm text-primary font-medium">{clienteAtivo.nome}</span>
+        )}
+      </div>
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
@@ -215,7 +236,7 @@ export default function OKRsPage() {
             OKRs — Objetivos e Resultados-Chave
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Confort Maison — {okrs.length} objetivo{okrs.length !== 1 ? 's' : ''} cadastrado{okrs.length !== 1 ? 's' : ''}
+            {clienteAtivo?.nome ?? 'Cliente'} — {okrs.length} objetivo{okrs.length !== 1 ? 's' : ''} cadastrado{okrs.length !== 1 ? 's' : ''}
           </p>
         </div>
         <Button
