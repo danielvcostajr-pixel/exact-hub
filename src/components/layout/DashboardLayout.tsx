@@ -17,6 +17,8 @@ interface DashboardLayoutProps {
   userEmail?: string
 }
 
+// NOTE: userRole defaults to "consultor" until auth role detection is implemented.
+// When auth is ready, pass the resolved role from session/JWT here.
 export function DashboardLayout({
   children,
   userRole = "consultor",

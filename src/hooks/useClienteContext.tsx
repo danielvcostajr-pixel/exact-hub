@@ -16,6 +16,7 @@ interface ClienteContextType {
   isFiltered: boolean
   clientes: ClienteInfo[]
   loading: boolean
+  refreshClientes: () => Promise<void>
 }
 
 const STORAGE_KEY = "exacthub_cliente_ativo"
@@ -26,6 +27,7 @@ const ClienteContext = createContext<ClienteContextType>({
   isFiltered: false,
   clientes: [],
   loading: true,
+  refreshClientes: async () => {},
 })
 
 function gerarInitials(nome: string): string {
@@ -53,17 +55,14 @@ export function ClienteContextProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [hydrated, setHydrated] = useState(false)
 
-  // Fetch real empresas from Supabase
-  useEffect(() => {
-    let cancelled = false
+  async function fetchEmpresas(restoreSelection = false) {
+    try {
+      const empresas = await getEmpresas()
+      if (empresas) {
+        const mapped = empresas.map(mapEmpresaToCliente)
+        setClientes(mapped)
 
-    async function fetchEmpresas() {
-      try {
-        const empresas = await getEmpresas()
-        if (!cancelled && empresas) {
-          const mapped = empresas.map(mapEmpresaToCliente)
-          setClientes(mapped)
-
+        if (restoreSelection) {
           // Restore persisted selection and validate against real list
           try {
             const stored = localStorage.getItem(STORAGE_KEY)
@@ -76,18 +75,31 @@ export function ClienteContextProvider({ children }: { children: ReactNode }) {
             // ignore malformed storage
           }
         }
-      } catch (err) {
-        console.error("Erro ao carregar empresas:", err)
-      } finally {
-        if (!cancelled) {
-          setLoading(false)
-          setHydrated(true)
-        }
+      }
+    } catch (err) {
+      console.error("Erro ao carregar empresas:", err)
+    }
+  }
+
+  const refreshClientes = async () => {
+    await fetchEmpresas(false)
+  }
+
+  // Fetch real empresas from Supabase
+  useEffect(() => {
+    let cancelled = false
+
+    async function init() {
+      await fetchEmpresas(true)
+      if (!cancelled) {
+        setLoading(false)
+        setHydrated(true)
       }
     }
 
-    fetchEmpresas()
+    init()
     return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const setClienteAtivo = (cliente: ClienteInfo | null) => {
@@ -107,7 +119,7 @@ export function ClienteContextProvider({ children }: { children: ReactNode }) {
   if (!hydrated) {
     return (
       <ClienteContext.Provider
-        value={{ clienteAtivo: null, setClienteAtivo, isFiltered: false, clientes: [], loading: true }}
+        value={{ clienteAtivo: null, setClienteAtivo, isFiltered: false, clientes: [], loading: true, refreshClientes }}
       >
         {children}
       </ClienteContext.Provider>
@@ -122,6 +134,7 @@ export function ClienteContextProvider({ children }: { children: ReactNode }) {
         isFiltered: clienteAtivo !== null,
         clientes,
         loading,
+        refreshClientes,
       }}
     >
       {children}

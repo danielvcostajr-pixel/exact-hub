@@ -1,10 +1,13 @@
 "use client"
 
+import Link from "next/link"
 import {
   TrendingUp,
   Grid3x3,
   MessageSquare,
-  BookOpen,
+  Target,
+  CheckSquare,
+  Users,
   CheckCircle2,
   Circle,
   Clock,
@@ -29,6 +32,7 @@ interface Module {
   lastUpdate?: string
 }
 
+// Only modules visible to client — no Timesheet, Configuracoes, Rotinas, Planos de Acao, Simuladores, Memoria
 const modules: Module[] = [
   {
     id: "projecao",
@@ -37,7 +41,7 @@ const modules: Module[] = [
     icon: TrendingUp,
     status: "pending",
     progress: 0,
-    href: "/cliente/projecao",
+    href: "/projecao-financeira",
     lastUpdate: undefined,
   },
   {
@@ -47,27 +51,47 @@ const modules: Module[] = [
     icon: Grid3x3,
     status: "pending",
     progress: 0,
-    href: "/cliente/canvas",
+    href: "/canvas-negocio",
     lastUpdate: undefined,
   },
   {
-    id: "entrevistas",
-    title: "Entrevistas",
-    description: "Diagnostico organizacional e entrevistas com a equipe",
+    id: "okrs",
+    title: "OKRs",
+    description: "Objetivos e resultados-chave da sua empresa",
+    icon: Target,
+    status: "pending",
+    progress: 0,
+    href: "/planejamento/okrs",
+    lastUpdate: undefined,
+  },
+  {
+    id: "tarefas",
+    title: "Tarefas",
+    description: "Acoes e atividades em andamento",
+    icon: CheckSquare,
+    status: "pending",
+    progress: 0,
+    href: "/tarefas",
+    lastUpdate: undefined,
+  },
+  {
+    id: "chat",
+    title: "Chat",
+    description: "Comunicacao direta com seu consultor",
     icon: MessageSquare,
     status: "pending",
     progress: 0,
-    href: "/cliente/entrevistas",
+    href: "/acompanhamento/chat",
     lastUpdate: undefined,
   },
   {
-    id: "memoria",
-    title: "Memoria",
-    description: "Base de conhecimento e historico da consultoria",
-    icon: BookOpen,
+    id: "reunioes",
+    title: "Reunioes",
+    description: "Historico e agendamento de reunioes",
+    icon: Users,
     status: "pending",
     progress: 0,
-    href: "/cliente/memoria",
+    href: "/acompanhamento/reunioes",
     lastUpdate: undefined,
   },
 ]
@@ -107,12 +131,14 @@ export default function ClienteDashboard() {
   const overallProgress = getOverallProgress(modules)
   const completedCount = modules.filter((m) => m.status === "complete").length
 
+  const companyName = clienteAtivo?.nome ?? "Sua Empresa"
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* Welcome */}
       <div>
         <h2 className="text-2xl font-bold text-foreground">
-          Bem-vindo, {clienteAtivo?.nome ?? 'Empresa'}
+          Bem-vindo, {companyName}
         </h2>
         <p className="text-sm text-muted-foreground mt-0.5">
           Acompanhe o progresso da sua consultoria
@@ -170,9 +196,9 @@ export default function ClienteDashboard() {
             const StatusIcon = config.icon
 
             return (
+              <Link key={mod.id} href={mod.href}>
               <Card
-                key={mod.id}
-                className="bg-card border-border ring-0 rounded-xl hover:border-primary/20 transition-all cursor-pointer group"
+                className="bg-card border-border ring-0 rounded-xl hover:border-primary/20 transition-all cursor-pointer group h-full"
               >
                 <CardHeader className="px-5 pt-5 pb-0">
                   <div className="flex items-start justify-between gap-3">
@@ -242,13 +268,17 @@ export default function ClienteDashboard() {
                       variant="ghost"
                       size="sm"
                       className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary gap-1"
+                      asChild
                     >
-                      {mod.status === "pending" ? "Iniciar" : "Acessar"}
-                      <ChevronRight className="size-3" />
+                      <span>
+                        {mod.status === "pending" ? "Iniciar" : "Acessar"}
+                        <ChevronRight className="size-3" />
+                      </span>
                     </Button>
                   </div>
                 </CardContent>
               </Card>
+              </Link>
             )
           })}
         </div>

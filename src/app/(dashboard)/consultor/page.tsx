@@ -19,12 +19,30 @@ import {
   LayoutGrid,
   ListTodo,
   BarChart2,
+  Plus,
+  MoreHorizontal,
+  Trash2,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   BarChart,
   Bar,
@@ -35,6 +53,7 @@ import {
   Cell,
 } from "recharts"
 import { useClienteContext, ClienteInfo } from "@/hooks/useClienteContext"
+import { createEmpresa, deleteEmpresa } from "@/lib/api/data-service"
 import { cn } from "@/lib/utils"
 
 // ─── Types ────────────────────────────────────────────────────────────────
@@ -127,7 +146,7 @@ type FocusTab = "visao-geral" | "projecao" | "canvas" | "okrs" | "tarefas" | "ch
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
-function ClientPipelineCard({ client }: { client: Client }) {
+function ClientPipelineCard({ client, onDelete }: { client: Client; onDelete?: (id: string) => void }) {
   return (
     <div className="bg-background border border-border rounded-lg p-3 hover:border-primary/30 transition-colors cursor-pointer group space-y-2.5">
       <div className="flex items-center gap-2">
@@ -136,9 +155,31 @@ function ClientPipelineCard({ client }: { client: Client }) {
             {client.initials}
           </AvatarFallback>
         </Avatar>
-        <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors leading-tight truncate">
+        <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors leading-tight truncate flex-1">
           {client.name}
         </p>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground shrink-0"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreHorizontal className="size-3.5" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-36">
+            <DropdownMenuItem
+              className="text-red-500 focus:text-red-500 cursor-pointer gap-2"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete?.(client.id)
+              }}
+            >
+              <Trash2 className="size-3.5" />
+              Excluir
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <div className="space-y-1">
         <div className="flex items-center justify-between text-[11px]">
@@ -564,12 +605,122 @@ function ClientFocusedView({ clientId }: { clientId: string }) {
   )
 }
 
+// ─── Nova Empresa Dialog ──────────────────────────────────────────────────────
+
+const emptyForm = {
+  razaoSocial: "",
+  nomeFantasia: "",
+  cnpj: "",
+  segmento: "",
+  porte: "",
+  responsavel: "",
+  telefone: "",
+  email: "",
+  cidade: "",
+  estado: "",
+}
+
+function NovaEmpresaDialog({
+  open,
+  onOpenChange,
+  onCreated,
+}: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  onCreated: () => void
+}) {
+  const [form, setForm] = useState(emptyForm)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function handleChange(field: keyof typeof emptyForm, value: string) {
+    setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  async function handleSave() {
+    if (!form.razaoSocial.trim()) {
+      setError("Razao Social e obrigatoria.")
+      return
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      await createEmpresa({
+        razaoSocial: form.razaoSocial.trim(),
+        nomeFantasia: form.nomeFantasia.trim() || undefined,
+        cnpj: form.cnpj.trim() || undefined,
+        segmento: form.segmento.trim() || undefined,
+        porte: form.porte.trim() || undefined,
+        responsavel: form.responsavel.trim() || undefined,
+        telefone: form.telefone.trim() || undefined,
+        email: form.email.trim() || undefined,
+        cidade: form.cidade.trim() || undefined,
+        estado: form.estado.trim() || undefined,
+      })
+      setForm(emptyForm)
+      onOpenChange(false)
+      onCreated()
+    } catch (err) {
+      console.error(err)
+      setError("Erro ao criar empresa. Tente novamente.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Nova Empresa</DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
+          {([
+            { field: "razaoSocial",  label: "Razao Social *",   placeholder: "Nome legal da empresa" },
+            { field: "nomeFantasia", label: "Nome Fantasia",     placeholder: "Nome comercial" },
+            { field: "cnpj",        label: "CNPJ",              placeholder: "00.000.000/0000-00" },
+            { field: "segmento",    label: "Segmento",          placeholder: "Ex: Varejo, Servicos..." },
+            { field: "porte",       label: "Porte",             placeholder: "Ex: Pequeno, Medio..." },
+            { field: "responsavel", label: "Responsavel",       placeholder: "Nome do responsavel" },
+            { field: "telefone",    label: "Telefone",          placeholder: "(00) 00000-0000" },
+            { field: "email",       label: "E-mail",            placeholder: "contato@empresa.com" },
+            { field: "cidade",      label: "Cidade",            placeholder: "Ex: Joao Pessoa" },
+            { field: "estado",      label: "Estado",            placeholder: "Ex: PB" },
+          ] as { field: keyof typeof emptyForm; label: string; placeholder: string }[]).map(({ field, label, placeholder }) => (
+            <div key={field} className="space-y-1">
+              <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
+              <Input
+                placeholder={placeholder}
+                value={form[field]}
+                onChange={(e) => handleChange(field, e.target.value)}
+                className="h-8 text-sm"
+              />
+            </div>
+          ))}
+        </div>
+        {error && (
+          <p className="text-xs text-red-500 mt-1">{error}</p>
+        )}
+        <DialogFooter className="gap-2">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button size="sm" className="gradient-exact text-white border-0" onClick={handleSave} disabled={saving}>
+            {saving ? "Salvando..." : "Criar Empresa"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ─── Consolidated View ─────────────────────────────────────────────────────────
 
 function ConsolidatedView() {
-  const { clientes, loading } = useClienteContext()
+  const { clientes, loading, refreshClientes } = useClienteContext()
   const [taskFilter, setTaskFilter] = useState<FilterKey>("Todas")
   const [timerRunning] = useState(true)
+  const [dialogOpen, setDialogOpen] = useState(false)
 
   const pipelineClients = clientes.map(mapClienteToClient)
   const totalClients    = pipelineClients.length
@@ -584,8 +735,23 @@ function ConsolidatedView() {
       ? mockTasks.filter((t) => t.status === "Atrasada")
       : mockTasks.filter((t) => t.status === taskFilter)
 
+  async function handleDelete(id: string) {
+    try {
+      await deleteEmpresa(id)
+      await refreshClientes()
+    } catch (err) {
+      console.error("Erro ao excluir empresa:", err)
+    }
+  }
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
+
+      <NovaEmpresaDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onCreated={refreshClientes}
+      />
 
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4">
@@ -595,12 +761,23 @@ function ConsolidatedView() {
             Visao consolidada de todos os seus clientes
           </p>
         </div>
-        <Link href="/timesheet">
-          <Button className="shrink-0 gradient-exact text-white font-medium shadow-lg shadow-primary/20 border-0">
-            <Timer className="size-4" />
-            Registrar Tempo
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setDialogOpen(true)}
+          >
+            <Plus className="size-4" />
+            Nova Empresa
           </Button>
-        </Link>
+          <Link href="/timesheet">
+            <Button className="gradient-exact text-white font-medium shadow-lg shadow-primary/20 border-0">
+              <Timer className="size-4" />
+              Registrar Tempo
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* ── KPI Cards ── */}
@@ -666,7 +843,7 @@ function ConsolidatedView() {
                   </div>
                   <div className="space-y-2">
                     {clients.map((c) => (
-                      <ClientPipelineCard key={c.id} client={c} />
+                      <ClientPipelineCard key={c.id} client={c} onDelete={handleDelete} />
                     ))}
                     {clients.length === 0 && (
                       <p className="text-xs text-muted-foreground/50 text-center py-4">

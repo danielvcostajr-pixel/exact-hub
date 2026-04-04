@@ -33,7 +33,7 @@ const pageTitles: Record<string, string> = {
   "/cliente": "Dashboard",
 }
 
-export function Header({ onMenuClick, userName = "Daniel Vieira" }: HeaderProps) {
+export function Header({ onMenuClick, userRole = "consultor", userName = "Daniel Vieira" }: HeaderProps) {
   const pathname = usePathname()
   const router = useRouter()
   const { clienteAtivo, isFiltered } = useClienteContext()
@@ -77,9 +77,9 @@ export function Header({ onMenuClick, userName = "Daniel Vieira" }: HeaderProps)
         </h1>
       </div>
 
-      {/* Cliente Selector */}
+      {/* Cliente Selector — only for consultores */}
       <div className="flex-1 flex items-center">
-        <ClienteSelector />
+        {userRole !== "cliente" && <ClienteSelector />}
       </div>
 
       {/* Search - hidden on mobile */}

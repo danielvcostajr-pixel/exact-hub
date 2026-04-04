@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import type { Empresa } from '@/types'
 
 // ── Empresas ──────────────────────────────────────────────────────────────────
 
@@ -22,6 +23,26 @@ export async function getEmpresa(id: string) {
     .single()
   if (error) throw error
   return data
+}
+
+export async function createEmpresa(data: Partial<Empresa>) {
+  const supabase = createClient()
+  const { data: empresa, error } = await supabase
+    .from('Empresa')
+    .insert({ ...data, ativa: true })
+    .select()
+    .single()
+  if (error) throw error
+  return empresa
+}
+
+export async function deleteEmpresa(id: string) {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('Empresa')
+    .update({ ativa: false })
+    .eq('id', id)
+  if (error) throw error
 }
 
 // ── Canvas de Negocio ─────────────────────────────────────────────────────────
