@@ -104,7 +104,7 @@ export function ComparativoCenarios({ projecoes, cenarioAtivo }: ComparativoCena
   const sorted = [...projecoes].sort((a, b) => a.mes - b.mes)
 
   const chartData = sorted.map((p) => ({
-    mes: MESES[p.mes - 1],
+    mes: MESES[((p.mes ?? 1) - 1 + 12) % 12] ?? `M${p.mes}`,
     valorPessimista: Math.round(p.valorPessimista),
     valorRealista: Math.round(p.valorRealista),
     valorOtimista: Math.round(p.valorOtimista),
@@ -222,7 +222,7 @@ export function ComparativoCenarios({ projecoes, cenarioAtivo }: ComparativoCena
             <tbody>
               {sorted.map((p, i) => (
                 <tr key={i} className="border-b border-border/50 hover:bg-secondary/20 transition-colors">
-                  <td className="px-4 py-2.5 text-muted-foreground font-medium">{MESES[p.mes - 1]}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground font-medium">{MESES[((p.mes ?? 1) - 1 + 12) % 12] ?? `M${p.mes}`}</td>
                   {CENARIOS.map(({ key }) => (
                     <td
                       key={key}

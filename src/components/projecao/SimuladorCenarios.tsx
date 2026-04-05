@@ -170,9 +170,15 @@ export function SimuladorCenarios({
       },
       despesas: {
         ...dadosBase.despesas,
-        variaveis: dadosBase.despesas.variaveis.map(v =>
-          v.categoria === 'cmv' ? { ...v, percentual: cmvPerc } : v
-        ),
+        variaveis: (() => {
+          // Scale CMV proportionally instead of replacing individual items
+          const cmvItems = dadosBase.despesas.variaveis.filter(v => v.categoria === 'cmv')
+          const totalCmvOriginal = cmvItems.reduce((s, v) => s + v.percentual, 0)
+          const scale = totalCmvOriginal > 0 ? cmvPerc / totalCmvOriginal : 1
+          return dadosBase.despesas.variaveis.map(v =>
+            v.categoria === 'cmv' ? { ...v, percentual: v.percentual * scale } : v
+          )
+        })(),
         fixos: dadosBase.despesas.fixos.map(f => ({
           ...f,
           valor: f.valor * (1 + ajusteFixos / 100),

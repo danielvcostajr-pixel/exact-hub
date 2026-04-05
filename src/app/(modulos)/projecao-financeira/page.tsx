@@ -168,7 +168,10 @@ export default function ProjecaoFinanceiraPage() {
         if (!cancelled && data?.dados) {
           const loaded = data.dados as ProjecaoFinanceiraCompleta
           setDados({ ...ESTADO_INICIAL, ...loaded, empresaId: clienteAtivo!.id })
-          if (loaded.anoBase) setAnoBase(loaded.anoBase - 1)
+          // anoBase no dados = ano de projecao. O state anoBase = ano base (ano anterior).
+          // Se salvou anoBase=2026, significa projecao para 2026, entao anoBase do state = 2025
+          const savedAnoProjecao = loaded.anoBase ?? data.anoBase
+          if (savedAnoProjecao) setAnoBase(savedAnoProjecao - 1)
         }
       } catch (err) {
         console.error('Erro ao carregar projecao:', err)
@@ -198,7 +201,14 @@ export default function ProjecaoFinanceiraPage() {
   }
 
   // ── Calcular projecao ────────────────────────────────────────
-  const calcular = useCallback(() => {
+  const calcular = useCallback(async () => {
+    // Validacao basica
+    if (dados.premissasVendas.historico.length === 0) {
+      alert('Preencha o historico de faturamento na Etapa 1 antes de calcular.')
+      setCurrentStep(1)
+      return
+    }
+
     setCalculando(true)
     try {
       const projecoes = gerarProjecaoCenarios({
@@ -228,10 +238,22 @@ export default function ProjecaoFinanceiraPage() {
       setResultados({ resultado, kpis, dreLinhas, projecoes, faturamento })
       setCurrentStep(6)
       setActiveResultTab('profecia')
+
+      // Auto-save apos calcular
+      if (clienteAtivo) {
+        try {
+          const toSave = { ...dados, empresaId: clienteAtivo.id, anoBase: anoProjecao }
+          await saveProjecao(clienteAtivo.id, toSave as unknown as Record<string, unknown>)
+          setSavedAt(new Date().toLocaleTimeString('pt-BR'))
+        } catch { /* silent auto-save */ }
+      }
+    } catch (err) {
+      console.error('Erro ao calcular:', err)
+      alert('Erro ao calcular projecao. Verifique os dados preenchidos.')
     } finally {
       setCalculando(false)
     }
-  }, [dados, anoProjecao])
+  }, [dados, anoProjecao, clienteAtivo])
 
   // ── Sidebar item ─────────────────────────────────────────────
   function SidebarStep({ step }: { step: StepConfig }) {
@@ -635,16 +657,16 @@ export default function ProjecaoFinanceiraPage() {
                 </button>
               )}
 
-              {/* Mobile calcular button (always visible on mobile) */}
-              {currentStep !== 5 && currentStep !== 6 && (
+              {/* Mobile calcular button - only at step 5 */}
+              {currentStep === 5 && (
                 <button
                   onClick={calcular}
                   disabled={calculando}
                   className="lg:hidden flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-xs transition-all disabled:opacity-60"
-                  style={{ background: 'hsl(var(--primary))', color: 'white' }}
+                  style={{ background: 'linear-gradient(135deg, #F17522 0%, #e8621a 100%)', color: 'white' }}
                 >
                   <PlayCircle size={14} />
-                  Calcular
+                  {calculando ? 'Calculando...' : 'Calcular'}
                 </button>
               )}
             </div>
