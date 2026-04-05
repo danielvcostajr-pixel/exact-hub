@@ -260,6 +260,40 @@ export async function createItemControle(params: {
   return data
 }
 
+export async function saveExecucaoRotina(params: {
+  itens: { itemControleId: string; concluido: boolean; observacao?: string }[]
+  executadoPorId: string
+}) {
+  const supabase = createClient()
+  const dataExecucao = now()
+  const rows = params.itens.map(it => ({
+    itemControleId: it.itemControleId,
+    concluido: it.concluido,
+    observacao: it.observacao ?? null,
+    executadoPorId: params.executadoPorId,
+    dataExecucao,
+  }))
+  const { data, error } = await supabase.from('ExecucaoItemControle').insert(rows).select()
+  if (error) throw error
+  return data
+}
+
+export async function getUltimaExecucaoRotina(rotinaId: string) {
+  const supabase = createClient()
+  // Get ItemControle IDs for this rotina
+  const { data: itens } = await supabase.from('ItemControle').select('id').eq('rotinaId', rotinaId)
+  if (!itens || itens.length === 0) return null
+  const itemIds = itens.map(i => i.id)
+  // Get latest execution for any of these items
+  const { data, error } = await supabase
+    .from('ExecucaoItemControle').select('*')
+    .in('itemControleId', itemIds)
+    .order('dataExecucao', { ascending: false })
+    .limit(itemIds.length)
+  if (error) throw error
+  return data
+}
+
 // ── Planos de Acao ───────────────────────────────────────────────────────────
 
 export async function getPlanosAcaoByEmpresa(empresaId: string) {
