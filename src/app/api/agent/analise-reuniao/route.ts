@@ -152,7 +152,21 @@ export async function POST(request: NextRequest) {
       ],
     })
 
-    const responseText = completion.choices[0]?.message?.content?.trim()
+    // Extract text from response — handle both string and array content formats
+    const rawContent = completion.choices[0]?.message?.content
+    let responseText: string
+    if (typeof rawContent === 'string') {
+      responseText = rawContent.trim()
+    } else if (Array.isArray(rawContent)) {
+      responseText = rawContent
+        .filter((part: unknown) => typeof part === 'object' && part !== null && 'type' in part && (part as { type: string }).type === 'text')
+        .map((part: unknown) => (part as { text: string }).text)
+        .join('\n')
+        .trim()
+    } else {
+      responseText = String(rawContent || '').trim()
+    }
+
     if (!responseText) {
       return NextResponse.json({ error: 'Resposta vazia do modelo' }, { status: 500 })
     }
@@ -162,7 +176,7 @@ export async function POST(request: NextRequest) {
     const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/)
     if (jsonMatch) jsonText = jsonMatch[1].trim()
 
-    // Remove /no_think tags if present (Qwen thinking mode)
+    // Remove thinking tags if present
     jsonText = jsonText.replace(/<\/?think>/g, '').trim()
 
     const parsed = JSON.parse(jsonText)
