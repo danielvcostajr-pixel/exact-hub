@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { Calendar, Plus, MapPin, Link2, Clock, Users, FileText, X, ArrowLeft } from "lucide-react"
 import { useClienteContext } from "@/hooks/useClienteContext"
@@ -9,27 +9,35 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FormReuniao, type ReuniaoFormData } from "@/components/acompanhamento/FormReuniao"
-import { getReunioesByEmpresa } from "@/lib/api/data-service"
+import { getReunioesByEmpresa, createReuniao, updateReuniao } from "@/lib/api/data-service"
 import { AtaReuniao } from "@/components/acompanhamento/AtaReuniao"
 
-type StatusReuniao = "AGENDADA" | "REALIZADA" | "CANCELADA"
+type StatusReuniao = "AGENDADA" | "CONFIRMADA" | "EM_ANDAMENTO" | "REALIZADA" | "CANCELADA"
 
 interface Reuniao {
   id: string
+  empresaId: string
   titulo: string
   descricao: string
   dataHora: string
   duracaoMinutos: number
-  tipo: "presencial" | "online"
   local?: string
-  link?: string
-  participantes: string[]
+  linkReuniao?: string
   status: StatusReuniao
-  pauta: string
+  gcalEventId?: string
+  createdAt?: string
+  updatedAt?: string
+  // local UI fields (not in DB)
+  tipo?: "presencial" | "online"
+  participantes?: string[]
+  link?: string
+  pauta?: string
 }
 
 const statusConfig: Record<StatusReuniao, { label: string; className: string }> = {
   AGENDADA: { label: "Agendada", className: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30" },
+  CONFIRMADA: { label: "Confirmada", className: "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/30" },
+  EM_ANDAMENTO: { label: "Em Andamento", className: "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border-yellow-500/30" },
   REALIZADA: { label: "Realizada", className: "bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30" },
   CANCELADA: { label: "Cancelada", className: "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30" },
 }
@@ -65,7 +73,8 @@ function ReuniaoCard({
   onCriarAta: (r: Reuniao) => void
   onCancelar: (id: string) => void
 }) {
-  const status = statusConfig[reuniao.status]
+  const status = statusConfig[reuniao.status] || statusConfig.AGENDADA
+  const participantes = reuniao.participantes || []
 
   return (
     <div className="rounded-xl border border-border bg-card p-5 space-y-4 hover:border-primary/30 transition-colors">
@@ -95,34 +104,36 @@ function ReuniaoCard({
           <span>{formatDuration(reuniao.duracaoMinutos)}</span>
         </div>
         <div className="flex items-center gap-1.5 col-span-2">
-          {reuniao.tipo === "presencial" ? (
-            <MapPin className="size-3.5 text-primary shrink-0" />
-          ) : (
+          {reuniao.linkReuniao || reuniao.link ? (
             <Link2 className="size-3.5 text-primary shrink-0" />
+          ) : (
+            <MapPin className="size-3.5 text-primary shrink-0" />
           )}
-          <span className="truncate">{reuniao.local || reuniao.link || "—"}</span>
+          <span className="truncate">{reuniao.local || reuniao.linkReuniao || reuniao.link || "—"}</span>
         </div>
       </div>
 
       {/* Participantes */}
-      <div className="flex items-center gap-2">
-        <Users className="size-3.5 text-muted-foreground shrink-0" />
-        <div className="flex -space-x-1.5">
-          {reuniao.participantes.slice(0, 5).map((p) => (
-            <Avatar key={p} className="size-6 ring-2 ring-card">
-              <AvatarFallback className="bg-primary/20 text-primary text-[9px] font-semibold">
-                {getInitials(p)}
-              </AvatarFallback>
-            </Avatar>
-          ))}
-          {reuniao.participantes.length > 5 && (
-            <div className="size-6 rounded-full bg-secondary ring-2 ring-card flex items-center justify-center">
-              <span className="text-[9px] text-muted-foreground font-medium">+{reuniao.participantes.length - 5}</span>
-            </div>
-          )}
+      {participantes.length > 0 && (
+        <div className="flex items-center gap-2">
+          <Users className="size-3.5 text-muted-foreground shrink-0" />
+          <div className="flex -space-x-1.5">
+            {participantes.slice(0, 5).map((p) => (
+              <Avatar key={p} className="size-6 ring-2 ring-card">
+                <AvatarFallback className="bg-primary/20 text-primary text-[9px] font-semibold">
+                  {getInitials(p)}
+                </AvatarFallback>
+              </Avatar>
+            ))}
+            {participantes.length > 5 && (
+              <div className="size-6 rounded-full bg-secondary ring-2 ring-card flex items-center justify-center">
+                <span className="text-[9px] text-muted-foreground font-medium">+{participantes.length - 5}</span>
+              </div>
+            )}
+          </div>
+          <span className="text-xs text-muted-foreground">{participantes.length} participante{participantes.length !== 1 ? "s" : ""}</span>
         </div>
-        <span className="text-xs text-muted-foreground">{reuniao.participantes.length} participante{reuniao.participantes.length !== 1 ? "s" : ""}</span>
-      </div>
+      )}
 
       {/* Actions */}
       {(reuniao.status === "REALIZADA" || reuniao.status === "AGENDADA") && (
@@ -160,41 +171,73 @@ export default function ReunioesPage() {
   const [reunioes, setReunioes] = useState<Reuniao[]>([])
   const [formOpen, setFormOpen] = useState(false)
   const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    if (clienteAtivo) {
-      setLoading(true)
-      getReunioesByEmpresa(clienteAtivo.id)
-        .then((data) => setReunioes(data as unknown as Reuniao[]))
-        .catch(() => setReunioes([]))
-        .finally(() => setLoading(false))
-    }
-  }, [clienteAtivo])
   const [ataReuniao, setAtaReuniao] = useState<Reuniao | null>(null)
 
-  const proximas = reunioes.filter((r) => r.status === "AGENDADA")
+  const loadReunioes = useCallback(async () => {
+    if (!clienteAtivo) return
+    setLoading(true)
+    try {
+      const data = await getReunioesByEmpresa(clienteAtivo.id)
+      setReunioes(data as unknown as Reuniao[])
+    } catch {
+      setReunioes([])
+    } finally {
+      setLoading(false)
+    }
+  }, [clienteAtivo])
+
+  useEffect(() => {
+    loadReunioes()
+  }, [loadReunioes])
+
+  const proximas = reunioes.filter((r) => r.status === "AGENDADA" || r.status === "CONFIRMADA")
   const realizadas = reunioes.filter((r) => r.status === "REALIZADA")
   const todas = reunioes
 
-  const handleSaveReuniao = (data: ReuniaoFormData) => {
-    const nova: Reuniao = {
-      id: Math.random().toString(36).slice(2, 9),
-      titulo: data.titulo,
-      descricao: data.descricao,
-      dataHora: data.dataHora,
-      duracaoMinutos: parseInt(data.duracaoMinutos),
-      tipo: data.tipo,
-      local: data.local || undefined,
-      link: data.link || undefined,
-      participantes: data.participantes,
-      status: "AGENDADA",
-      pauta: data.pauta,
+  const handleSaveReuniao = async (data: ReuniaoFormData) => {
+    if (!clienteAtivo) return
+    try {
+      await createReuniao({
+        empresaId: clienteAtivo.id,
+        titulo: data.titulo,
+        descricao: data.descricao || undefined,
+        dataHora: data.dataHora,
+        duracaoMinutos: parseInt(data.duracaoMinutos) || 60,
+        local: data.tipo === "presencial" ? data.local || undefined : undefined,
+        linkReuniao: data.tipo === "online" ? data.link || undefined : undefined,
+        status: "AGENDADA",
+      })
+      // Reload from DB to get the server-generated id and timestamps
+      await loadReunioes()
+    } catch (err) {
+      console.error("Erro ao criar reuniao:", err)
+      // Fallback: add to local state so the UI is not broken
+      const nova: Reuniao = {
+        id: Math.random().toString(36).slice(2, 9),
+        empresaId: clienteAtivo.id,
+        titulo: data.titulo,
+        descricao: data.descricao,
+        dataHora: data.dataHora,
+        duracaoMinutos: parseInt(data.duracaoMinutos),
+        local: data.local || undefined,
+        linkReuniao: data.link || undefined,
+        status: "AGENDADA",
+        participantes: data.participantes,
+      }
+      setReunioes((prev) => [nova, ...prev])
     }
-    setReunioes((prev) => [nova, ...prev])
   }
 
-  const handleCancelar = (id: string) => {
-    setReunioes((prev) => prev.map((r) => r.id === id ? { ...r, status: "CANCELADA" } : r))
+  const handleCancelar = async (id: string) => {
+    try {
+      await updateReuniao(id, { status: "CANCELADA" })
+      // Update local state immediately for responsive UI
+      setReunioes((prev) => prev.map((r) => r.id === id ? { ...r, status: "CANCELADA" as StatusReuniao } : r))
+    } catch (err) {
+      console.error("Erro ao cancelar reuniao:", err)
+      // Fallback: update local state anyway
+      setReunioes((prev) => prev.map((r) => r.id === id ? { ...r, status: "CANCELADA" as StatusReuniao } : r))
+    }
   }
 
   if (!isFiltered) {

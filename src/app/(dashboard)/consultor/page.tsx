@@ -1232,14 +1232,14 @@ function NovaEmpresaDialog({
 function ConsolidatedView() {
   const { clientes, loading, refreshClientes } = useClienteContext()
   const [taskFilter, setTaskFilter] = useState<FilterKey>("Todas")
-  const [timerRunning] = useState(true)
+  const [timerRunning] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
 
   const pipelineClients = clientes.map(mapClienteToClient)
   const totalClients    = pipelineClients.length
   const totalPending    = mockTasks.filter((t) => t.status !== "Proxima Semana").length
   const totalHorasWeek  = weeklyHours.reduce((s, h) => s + h.horas, 0)
-  const reunioesWeek    = 3
+  const reunioesWeek    = 0
 
   const filteredTasks =
     taskFilter === "Todas"
@@ -1269,7 +1269,7 @@ function ConsolidatedView() {
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Bom dia, Daniel</h2>
+          <h2 className="text-2xl font-bold text-foreground">Dashboard do Consultor</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
             Visao consolidada de todos os seus clientes
           </p>
@@ -1297,7 +1297,7 @@ function ConsolidatedView() {
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {[
           { label: "Clientes Ativos",    value: totalClients,              sub: `${totalClients} empresas ativas`, icon: Building2,   iconColor: "text-blue-500",   iconBg: "bg-blue-500/10" },
-          { label: "Tarefas Pendentes",  value: totalPending,              sub: "2 atrasadas",       icon: CheckSquare, iconColor: "text-red-500",    iconBg: "bg-red-500/10" },
+          { label: "Tarefas Pendentes",  value: totalPending,              sub: `${totalPending} pendentes`,       icon: CheckSquare, iconColor: "text-red-500",    iconBg: "bg-red-500/10" },
           { label: "Horas Registradas",  value: `${totalHorasWeek.toFixed(1)}h`, sub: "esta semana", icon: Clock,       iconColor: "text-primary",    iconBg: "bg-primary/10" },
           { label: "Proximas Reunioes",  value: reunioesWeek,              sub: "esta semana",       icon: Calendar,    iconColor: "text-purple-500", iconBg: "bg-purple-500/10" },
         ].map((kpi) => {

@@ -36,6 +36,13 @@ export interface LogAtividade {
   data: string
 }
 
+export interface Usuario {
+  id: string
+  nome: string
+  email?: string
+  papel?: string
+}
+
 export interface Tarefa {
   id: string
   titulo: string
@@ -43,6 +50,7 @@ export interface Tarefa {
   status: StatusTarefa
   prioridade: PrioridadeTarefa
   responsavel: string
+  responsavelId?: string | null
   responsavelAvatar?: string
   dataInicio: string
   prazo: string
@@ -57,6 +65,7 @@ export interface Tarefa {
   acaoId?: string
   comentariosCount: number
   anexosCount: number
+  empresaId?: string
 }
 
 export const STATUS_CONFIG: Record<

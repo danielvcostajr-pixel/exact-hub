@@ -1,13 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, ListChecks, ChevronDown, ChevronUp, Link2, Users, ArrowLeft } from 'lucide-react'
+import { Plus, ListChecks, ChevronDown, ChevronUp, Link2, Users, ArrowLeft, Loader2 } from 'lucide-react'
 import { useClienteContext } from '@/hooks/useClienteContext'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { MatrizRACI, type AcaoRaci, type UsuarioRaci } from '@/components/planejamento/MatrizRACI'
+import { getPlanosAcaoByEmpresa, createPlanoAcao, createAcao, getUsuarios } from '@/lib/api/data-service'
 
 type StatusAcao = 'Pendente' | 'Em Andamento' | 'Concluida' | 'Bloqueada'
 
@@ -33,13 +38,12 @@ interface PlanoAcao {
   acoes: Acao[]
 }
 
-const USUARIOS_RACI: UsuarioRaci[] = [
-  { id: 'usr-1', nome: 'Ana Beatriz', papel: 'Diretora' },
-  { id: 'usr-2', nome: 'Carlos Eduardo', papel: 'Comercial' },
-  { id: 'usr-3', nome: 'Fernanda', papel: 'Marketing' },
-  { id: 'usr-4', nome: 'Rodrigo', papel: 'E-commerce' },
-  { id: 'usr-5', nome: 'Patricia', papel: 'RH' },
-]
+const STATUS_MAP: Record<string, StatusAcao> = {
+  PENDENTE: 'Pendente',
+  EM_ANDAMENTO: 'Em Andamento',
+  CONCLUIDA: 'Concluida',
+  BLOQUEADA: 'Bloqueada',
+}
 
 const STATUS_STYLES: Record<string, string> = {
   Ativo: 'bg-blue-500/15 text-blue-500 border-blue-500/30',
@@ -66,7 +70,33 @@ function calcProgress(acoes: Acao[]): number {
   return Math.round((done / acoes.length) * 100)
 }
 
-function PlanoCard({ plano }: { plano: PlanoAcao }) {
+function dbToPlano(row: Record<string, unknown>): PlanoAcao {
+  const acoesRaw = (row.Acao as Array<Record<string, unknown>> | undefined) ?? []
+  const acoes: Acao[] = acoesRaw.map((a) => ({
+    id: a.id as string,
+    descricao: a.descricao as string,
+    responsavel: '',
+    prazo: (a.prazo as string) ?? '',
+    status: STATUS_MAP[(a.status as string) ?? 'PENDENTE'] ?? 'Pendente',
+    prioridade: 'Media' as const,
+    atribuicoes: {},
+  }))
+
+  const allDone = acoes.length > 0 && acoes.every((a) => a.status === 'Concluida')
+
+  return {
+    id: row.id as string,
+    titulo: row.titulo as string,
+    descricao: (row.descricao as string) ?? '',
+    okrVinculadoId: row.okrId as string | undefined,
+    status: allDone ? 'Concluido' : 'Ativo',
+    responsavel: '',
+    prazoFim: '',
+    acoes,
+  }
+}
+
+function PlanoCard({ plano, usuarios }: { plano: PlanoAcao; usuarios: UsuarioRaci[] }) {
   const [expanded, setExpanded] = useState(false)
   const [activeTab, setActiveTab] = useState<'acoes' | 'raci'>('acoes')
   const progress = calcProgress(plano.acoes)
@@ -120,16 +150,20 @@ function PlanoCard({ plano }: { plano: PlanoAcao }) {
 
         {/* Meta */}
         <div className="flex items-center gap-4 flex-wrap">
-          <span className="text-xs text-muted-foreground">
-            Resp.: <span className="text-foreground">{plano.responsavel}</span>
-          </span>
-          <span className="text-xs text-muted-foreground">
-            Prazo: <span className="text-foreground">{plano.prazoFim}</span>
-          </span>
-          {plano.okrVinculadoTitulo && (
+          {plano.responsavel && (
+            <span className="text-xs text-muted-foreground">
+              Resp.: <span className="text-foreground">{plano.responsavel}</span>
+            </span>
+          )}
+          {plano.prazoFim && (
+            <span className="text-xs text-muted-foreground">
+              Prazo: <span className="text-foreground">{plano.prazoFim}</span>
+            </span>
+          )}
+          {plano.okrVinculadoId && (
             <span className="text-xs text-primary flex items-center gap-1">
               <Link2 size={10} />
-              Vinculado: {plano.okrVinculadoTitulo.substring(0, 45)}...
+              Vinculado a OKR
             </span>
           )}
         </div>
@@ -166,6 +200,9 @@ function PlanoCard({ plano }: { plano: PlanoAcao }) {
           {/* Acoes tab */}
           {activeTab === 'acoes' && (
             <div className="flex flex-col gap-2">
+              {plano.acoes.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma acao registrada neste plano.</p>
+              )}
               {plano.acoes.map((acao) => (
                 <div
                   key={acao.id}
@@ -174,15 +211,13 @@ function PlanoCard({ plano }: { plano: PlanoAcao }) {
                   <div className="flex flex-col gap-1 flex-1 min-w-0">
                     <span className="text-sm text-foreground leading-snug">{acao.descricao}</span>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-muted-foreground">{acao.responsavel.split(' ')[0]}</span>
-                      <span className="text-xs text-muted-foreground">•</span>
-                      <span className="text-xs text-muted-foreground">{acao.prazo}</span>
-                      <Badge
-                        variant="outline"
-                        className={`text-[10px] border px-1.5 py-0 ${PRIOR_STYLES[acao.prioridade]}`}
-                      >
-                        {acao.prioridade}
-                      </Badge>
+                      {acao.responsavel && <span className="text-xs text-muted-foreground">{acao.responsavel.split(' ')[0]}</span>}
+                      {acao.prazo && (
+                        <>
+                          <span className="text-xs text-muted-foreground">•</span>
+                          <span className="text-xs text-muted-foreground">{acao.prazo}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                   <Badge
@@ -200,7 +235,7 @@ function PlanoCard({ plano }: { plano: PlanoAcao }) {
           {activeTab === 'raci' && (
             <MatrizRACI
               acoes={raciAcoes}
-              usuarios={USUARIOS_RACI}
+              usuarios={usuarios}
             />
           )}
         </div>
@@ -211,7 +246,67 @@ function PlanoCard({ plano }: { plano: PlanoAcao }) {
 
 export default function PlanosAcaoPage() {
   const { clienteAtivo, isFiltered } = useClienteContext()
-  const [planos] = useState<PlanoAcao[]>([])
+  const [planos, setPlanos] = useState<PlanoAcao[]>([])
+  const [usuarios, setUsuarios] = useState<UsuarioRaci[]>([])
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  // Dialog
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [formTitulo, setFormTitulo] = useState('')
+  const [formDescricao, setFormDescricao] = useState('')
+
+  const loadData = useCallback(async () => {
+    if (!clienteAtivo) return
+    setLoading(true)
+    try {
+      const [planosData, usuariosData] = await Promise.all([
+        getPlanosAcaoByEmpresa(clienteAtivo.id),
+        getUsuarios(),
+      ])
+      setPlanos((planosData ?? []).map((r: Record<string, unknown>) => dbToPlano(r)))
+      setUsuarios(
+        (usuariosData ?? []).map((u: Record<string, unknown>) => ({
+          id: u.id as string,
+          nome: u.nome as string,
+          papel: (u.papel as string) ?? undefined,
+        }))
+      )
+    } catch (err) {
+      console.error('Erro ao carregar planos de acao:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [clienteAtivo])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  function openDialog() {
+    setFormTitulo('')
+    setFormDescricao('')
+    setDialogOpen(true)
+  }
+
+  async function handleCriarPlano() {
+    if (!clienteAtivo || !formTitulo.trim()) return
+    setSaving(true)
+    try {
+      await createPlanoAcao({
+        empresaId: clienteAtivo.id,
+        titulo: formTitulo.trim(),
+        descricao: formDescricao.trim() || undefined,
+      })
+      setDialogOpen(false)
+      await loadData()
+    } catch (err) {
+      console.error('Erro ao criar plano:', err)
+      alert('Erro ao criar plano de acao.')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const ativos = planos.filter((p) => p.status === 'Ativo').length
   const totalAcoes = planos.reduce((s, p) => s + p.acoes.length, 0)
@@ -249,6 +344,7 @@ export default function PlanosAcaoPage() {
           </p>
         </div>
         <Button
+          onClick={openDialog}
           className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white gap-2 shrink-0"
         >
           <Plus size={16} />
@@ -256,45 +352,100 @@ export default function PlanosAcaoPage() {
         </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: 'Planos ativos', value: ativos, color: 'text-blue-500' },
-          { label: 'Rascunhos', value: planos.filter((p) => p.status === 'Rascunho').length, color: 'text-muted-foreground' },
-          { label: 'Total de acoes', value: totalAcoes, color: 'text-foreground' },
-          { label: 'Acoes concluidas', value: totalConcluidas, color: 'text-green-500' },
-        ].map((item) => (
-          <div
-            key={item.label}
-            className="rounded-xl border border-border bg-card p-4 flex flex-col gap-1"
-          >
-            <span className="text-xs text-muted-foreground">{item.label}</span>
-            <span className={`text-2xl font-bold tabular-nums ${item.color}`}>{item.value}</span>
-          </div>
-        ))}
-      </div>
+      {/* Loading */}
+      {loading && (
+        <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
+          <Loader2 size={18} className="animate-spin" />
+          <span className="text-sm">Carregando planos...</span>
+        </div>
+      )}
 
-      {/* Plans list */}
-      <div className="flex flex-col gap-3">
-        {planos.map((plano) => (
-          <PlanoCard key={plano.id} plano={plano} />
-        ))}
-        {planos.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 gap-4">
-            <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
-              <ListChecks size={24} className="text-muted-foreground" />
-            </div>
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-foreground mb-1">Nenhum plano de acao criado</h3>
-              <p className="text-sm text-muted-foreground max-w-md">Crie o primeiro plano de acao para este cliente.</p>
-            </div>
-            <Button className="gradient-exact text-white mt-2">
-              <Plus size={16} />
-              Criar Primeiro Plano
-            </Button>
+      {!loading && (
+        <>
+          {/* Stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: 'Planos ativos', value: ativos, color: 'text-blue-500' },
+              { label: 'Rascunhos', value: planos.filter((p) => p.status === 'Rascunho').length, color: 'text-muted-foreground' },
+              { label: 'Total de acoes', value: totalAcoes, color: 'text-foreground' },
+              { label: 'Acoes concluidas', value: totalConcluidas, color: 'text-green-500' },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="rounded-xl border border-border bg-card p-4 flex flex-col gap-1"
+              >
+                <span className="text-xs text-muted-foreground">{item.label}</span>
+                <span className={`text-2xl font-bold tabular-nums ${item.color}`}>{item.value}</span>
+              </div>
+            ))}
           </div>
-        )}
-      </div>
+
+          {/* Plans list */}
+          <div className="flex flex-col gap-3">
+            {planos.map((plano) => (
+              <PlanoCard key={plano.id} plano={plano} usuarios={usuarios} />
+            ))}
+            {planos.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-16 gap-4">
+                <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
+                  <ListChecks size={24} className="text-muted-foreground" />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-foreground mb-1">Nenhum plano de acao criado</h3>
+                  <p className="text-sm text-muted-foreground max-w-md">Crie o primeiro plano de acao para este cliente.</p>
+                </div>
+                <Button onClick={openDialog} className="gradient-exact text-white mt-2">
+                  <Plus size={16} />
+                  Criar Primeiro Plano
+                </Button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Dialog Novo Plano */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Novo Plano de Acao</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 py-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="plano-titulo">Titulo *</Label>
+              <Input
+                id="plano-titulo"
+                placeholder="Ex: Plano de Expansao Comercial"
+                value={formTitulo}
+                onChange={(e) => setFormTitulo(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="plano-desc">Descricao</Label>
+              <Textarea
+                id="plano-desc"
+                placeholder="Descreva o objetivo do plano..."
+                value={formDescricao}
+                onChange={(e) => setFormDescricao(e.target.value)}
+                className="resize-none h-24"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={!formTitulo.trim() || saving}
+              onClick={handleCriarPlano}
+              className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white gap-1.5"
+            >
+              {saving && <Loader2 size={14} className="animate-spin" />}
+              Criar Plano
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

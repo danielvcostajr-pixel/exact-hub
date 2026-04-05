@@ -47,6 +47,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts"
+import { getAllTimesheet, createTimeEntry, deleteTimeEntry, getEmpresas } from "@/lib/api/data-service"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,32 +57,23 @@ interface TimeEntry {
   id: string
   date: string
   client: string
+  clientId: string
   activity: string
   duration: number // minutes
   type: EntryType
 }
 
+interface ClientOption {
+  id: string
+  nome: string
+}
+
 type ReportRange = "esta-semana" | "este-mes" | "mes-passado" | "personalizado"
 
-// ─── Data ────────────────────────────────────────────────────────────────
-
-const CLIENTS: string[] = []
-
-const PLANNED_HOURS: Record<string, number> = {}
-
-const RATE_PER_HOUR: Record<string, number> = {}
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const today = new Date()
 const fmtDate = (dt: Date) => dt.toLocaleDateString("pt-BR")
-const dayOffset = (n: number) => {
-  const d = new Date(today)
-  d.setDate(d.getDate() + n)
-  return fmtDate(d)
-}
-
-const INITIAL_ENTRIES: TimeEntry[] = []
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const fmtDuration = (minutes: number): string => {
   const h = Math.floor(minutes / 60)
@@ -107,7 +99,28 @@ const CLIENT_COLORS: Record<string, string> = {
   "Auto Center JP":  "#6366f1",
 }
 
+// Generate fallback colors for clients not in the hardcoded map
+const FALLBACK_COLORS = ["#f97316", "#22c55e", "#a855f7", "#ec4899", "#eab308", "#3b82f6", "#14b8a6", "#6366f1"]
+function getClientColor(name: string, index: number): string {
+  return CLIENT_COLORS[name] || FALLBACK_COLORS[index % FALLBACK_COLORS.length]
+}
+
 const WEEK_DAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"]
+
+// Convert "dd/mm/yyyy" to "yyyy-mm-dd" for comparison
+function parsePtBrDate(dateStr: string): string {
+  const parts = dateStr.split("/")
+  if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`
+  return dateStr
+}
+
+// Convert ISO date "yyyy-mm-dd" to "dd/mm/yyyy"
+function isoToPtBr(isoDate: string): string {
+  if (!isoDate) return ""
+  const parts = isoDate.split("T")[0].split("-")
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`
+  return isoDate
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -123,7 +136,9 @@ function EntryTypeIcon({ type }: { type: EntryType }) {
 
 export default function TimesheetPage() {
   const { clienteAtivo, isFiltered } = useClienteContext()
-  const [entries, setEntries] = useState<TimeEntry[]>(INITIAL_ENTRIES)
+  const [entries, setEntries] = useState<TimeEntry[]>([])
+  const [clients, setClients] = useState<ClientOption[]>([])
+  const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("registros")
 
   // Timer state
@@ -147,6 +162,50 @@ export default function TimesheetPage() {
 
   // Report state
   const [reportRange, setReportRange] = useState<ReportRange>("esta-semana")
+
+  // ── Load data from Supabase ──────────────────────────────────────────────
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [timesheetData, empresasData] = await Promise.all([
+        getAllTimesheet(),
+        getEmpresas(),
+      ])
+
+      // Map empresas to client options
+      const clientOptions: ClientOption[] = (empresasData || []).map((e: Record<string, unknown>) => ({
+        id: e.id as string,
+        nome: (e.nomeFantasia || e.razaoSocial || "Sem nome") as string,
+      }))
+      setClients(clientOptions)
+
+      // Map timesheet entries to our internal format
+      const mapped: TimeEntry[] = (timesheetData || []).map((t: Record<string, unknown>) => {
+        const empresa = t.empresa as Record<string, unknown> | null
+        const clientName = empresa
+          ? ((empresa.nomeFantasia || empresa.razaoSocial || "Sem nome") as string)
+          : "Sem cliente"
+        return {
+          id: t.id as string,
+          date: isoToPtBr(t.data as string),
+          client: clientName,
+          clientId: t.empresaId as string,
+          activity: (t.descricao as string) || "Atividade",
+          duration: (t.duracaoMinutos as number) || 0,
+          type: (t.horaInicio ? "timer" : "manual") as EntryType,
+        }
+      })
+      setEntries(mapped)
+    } catch (err) {
+      console.error("Erro ao carregar dados do timesheet:", err)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   // ── Load timer from localStorage ──────────────────────────────────────────
   useEffect(() => {
@@ -199,6 +258,12 @@ export default function TimesheetPage() {
     []
   )
 
+  // Helper to resolve client name to clientId
+  const getClientId = (clientName: string): string => {
+    const found = clients.find((c) => c.nome === clientName)
+    return found?.id || ""
+  }
+
   const handleStart = () => {
     if (!timerClient) return
     setTimerRunning(true)
@@ -216,18 +281,44 @@ export default function TimesheetPage() {
     persistTimer(true, false, timerSeconds, timerClient, timerActivity)
   }
 
-  const handleStop = () => {
+  const handleStop = async () => {
     const duration = Math.max(1, Math.round(timerSeconds / 60))
     if (timerClient) {
-      const newEntry: TimeEntry = {
-        id: `e${Date.now()}`,
-        date: fmtDate(today),
-        client: timerClient,
-        activity: timerActivity || "Sessao de trabalho",
-        duration,
-        type: "timer",
+      const clientId = getClientId(timerClient)
+      const now = new Date()
+      const horaFim = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`
+      const startTime = new Date(now.getTime() - timerSeconds * 1000)
+      const horaInicio = `${startTime.getHours().toString().padStart(2, "0")}:${startTime.getMinutes().toString().padStart(2, "0")}`
+      const dataISO = now.toISOString().split("T")[0]
+
+      try {
+        if (clientId) {
+          await createTimeEntry({
+            empresaId: clientId,
+            descricao: timerActivity || "Sessao de trabalho",
+            data: dataISO,
+            horaInicio,
+            horaFim,
+            duracaoMinutos: duration,
+            categoria: "timer",
+          })
+          // Reload entries from DB
+          await loadData()
+        }
+      } catch (err) {
+        console.error("Erro ao salvar entrada de timer:", err)
+        // Fallback: add to local state
+        const newEntry: TimeEntry = {
+          id: `e${Date.now()}`,
+          date: fmtDate(today),
+          client: timerClient,
+          clientId,
+          activity: timerActivity || "Sessao de trabalho",
+          duration,
+          type: "timer",
+        }
+        setEntries((prev) => [newEntry, ...prev])
       }
-      setEntries((prev) => [newEntry, ...prev])
     }
     setTimerRunning(false)
     setTimerPaused(false)
@@ -237,20 +328,43 @@ export default function TimesheetPage() {
     localStorage.removeItem("exacthub_timer")
   }
 
-  const handleAddEntry = () => {
+  const handleAddEntry = async () => {
     const h = parseInt(newHours || "0", 10)
     const m = parseInt(newMinutes || "0", 10)
     const duration = h * 60 + m
     if (!newClient || duration <= 0) return
-    const entry: TimeEntry = {
-      id: `e${Date.now()}`,
-      date: newDate,
-      client: newClient,
-      activity: newActivity || "Atividade manual",
-      duration,
-      type: "manual",
+
+    const clientId = getClientId(newClient)
+    // Convert dd/mm/yyyy to yyyy-mm-dd
+    const dataISO = parsePtBrDate(newDate)
+
+    try {
+      if (clientId) {
+        await createTimeEntry({
+          empresaId: clientId,
+          descricao: newActivity || "Atividade manual",
+          data: dataISO,
+          duracaoMinutos: duration,
+          categoria: "manual",
+        })
+        // Reload entries from DB
+        await loadData()
+      }
+    } catch (err) {
+      console.error("Erro ao salvar registro manual:", err)
+      // Fallback: add to local state
+      const entry: TimeEntry = {
+        id: `e${Date.now()}`,
+        date: newDate,
+        client: newClient,
+        clientId,
+        activity: newActivity || "Atividade manual",
+        duration,
+        type: "manual",
+      }
+      setEntries((prev) => [entry, ...prev])
     }
-    setEntries((prev) => [entry, ...prev])
+
     setShowNewEntry(false)
     setNewClient("")
     setNewActivity("")
@@ -258,9 +372,19 @@ export default function TimesheetPage() {
     setNewMinutes("")
   }
 
-  const handleDelete = (id: string) => {
-    setEntries((prev) => prev.filter((e) => e.id !== id))
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteTimeEntry(id)
+      setEntries((prev) => prev.filter((e) => e.id !== id))
+    } catch (err) {
+      console.error("Erro ao excluir entrada:", err)
+      // Still remove from UI
+      setEntries((prev) => prev.filter((e) => e.id !== id))
+    }
   }
+
+  // ── Client names list for selects and reports ─────────────────────────────
+  const CLIENT_NAMES = clients.map((c) => c.nome)
 
   // ── Filtered entries ───────────────────────────────────────────────────────
   const filteredEntries =
@@ -272,7 +396,7 @@ export default function TimesheetPage() {
     .filter((e) => {
       const d = new Date(today)
       d.setDate(d.getDate() - 7)
-      const entryDate = e.date.split("/").reverse().join("-")
+      const entryDate = parsePtBrDate(e.date)
       return new Date(entryDate) >= d
     })
     .reduce((s, e) => s + e.duration, 0)
@@ -284,13 +408,13 @@ export default function TimesheetPage() {
       const weekStart = new Date(now)
       weekStart.setDate(now.getDate() - now.getDay() + 1)
       return entries.filter((e) => {
-        const [d2, m2, y2] = e.date.split("/")
-        return new Date(`${y2}-${m2}-${d2}`) >= weekStart
+        const entryDate = parsePtBrDate(e.date)
+        return new Date(entryDate) >= weekStart
       })
     }
     if (reportRange === "este-mes") {
       return entries.filter((e) => {
-        const [, m2, y2] = e.date.split("/")
+        const [d2, m2, y2] = e.date.split("/")
         return parseInt(m2) === now.getMonth() + 1 && parseInt(y2) === now.getFullYear()
       })
     }
@@ -305,10 +429,13 @@ export default function TimesheetPage() {
     return entries
   })()
 
-  const hoursByClient = CLIENTS.map((c) => ({
+  // Build unique client names from entries for report charts
+  const activeClientNames = [...new Set(entries.map((e) => e.client))]
+
+  const hoursByClient = activeClientNames.map((c, i) => ({
     client: c,
     horas: Math.round((reportEntries.filter((e) => e.client === c).reduce((s, e) => s + e.duration, 0) / 60) * 10) / 10,
-    fill: CLIENT_COLORS[c] || "#f97316",
+    fill: getClientColor(c, i),
   }))
     .filter((x) => x.horas > 0)
     .sort((a, b) => b.horas - a.horas)
@@ -337,6 +464,14 @@ export default function TimesheetPage() {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
         <p className="text-muted-foreground">Selecione um cliente no seletor acima para visualizar os dados.</p>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     )
   }
@@ -389,7 +524,7 @@ export default function TimesheetPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos os clientes</SelectItem>
-                  {CLIENTS.map((c) => (
+                  {CLIENT_NAMES.map((c) => (
                     <SelectItem key={c} value={c}>{c}</SelectItem>
                   ))}
                 </SelectContent>
@@ -508,7 +643,7 @@ export default function TimesheetPage() {
                       <SelectValue placeholder="Selecione o cliente..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {CLIENTS.map((c) => (
+                      {CLIENT_NAMES.map((c) => (
                         <SelectItem key={c} value={c}>{c}</SelectItem>
                       ))}
                     </SelectContent>
@@ -731,7 +866,7 @@ export default function TimesheetPage() {
               },
               {
                 label: "Horas vs Meta",
-                value: `${Math.min(100, Math.round((totalReportHours / META_HORAS) * 100))}%`,
+                value: `${META_HORAS > 0 ? Math.min(100, Math.round((totalReportHours / META_HORAS) * 100)) : 0}%`,
                 sub: `meta: ${META_HORAS}h`,
                 icon: Target,
                 color: "text-purple-500",
@@ -866,21 +1001,20 @@ export default function TimesheetPage() {
                   <thead>
                     <tr className="border-b border-border bg-secondary/40">
                       <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-5 py-3">Cliente</th>
-                      <th className="text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-4 py-3">Planejado</th>
                       <th className="text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-4 py-3">Realizado</th>
-                      <th className="text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-4 py-3">%</th>
-                      <th className="text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-5 py-3">Valor (R$)</th>
+                      <th className="text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-4 py-3">Registros</th>
+                      <th className="text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-5 py-3">% do Total</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {CLIENTS.map((client) => {
+                    {activeClientNames.map((client, idx) => {
                       const realized =
                         reportEntries
                           .filter((e) => e.client === client)
                           .reduce((s, e) => s + e.duration, 0) / 60
-                      const planned = PLANNED_HOURS[client] || 0
-                      const pct = planned > 0 ? Math.round((realized / planned) * 100) : 0
-                      const value = Math.round(realized * (RATE_PER_HOUR[client] || 200))
+                      const count = reportEntries.filter((e) => e.client === client).length
+                      const pct = totalReportHours > 0 ? Math.round((realized / totalReportHours) * 100) : 0
+                      if (realized === 0) return null
                       return (
                         <tr
                           key={client}
@@ -890,32 +1024,27 @@ export default function TimesheetPage() {
                             <div className="flex items-center gap-2">
                               <span
                                 className="w-2.5 h-2.5 rounded-full shrink-0"
-                                style={{ background: CLIENT_COLORS[client] || "#f97316" }}
+                                style={{ background: getClientColor(client, idx) }}
                               />
                               <span className="text-[13px] font-medium text-foreground">{client}</span>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-right text-[13px] text-muted-foreground tabular-nums">
-                            {planned}h
-                          </td>
                           <td className="px-4 py-3 text-right text-[13px] font-semibold text-foreground tabular-nums">
                             {Math.round(realized * 10) / 10}h
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3 text-right text-[13px] text-muted-foreground tabular-nums">
+                            {count}
+                          </td>
+                          <td className="px-5 py-3 text-right">
                             <span
                               className={`text-[12px] font-semibold tabular-nums ${
-                                pct >= 100
-                                  ? "text-green-600 dark:text-green-400"
-                                  : pct >= 60
+                                pct >= 30
                                   ? "text-primary"
                                   : "text-muted-foreground"
                               }`}
                             >
                               {pct}%
                             </span>
-                          </td>
-                          <td className="px-5 py-3 text-right text-[13px] font-semibold text-foreground tabular-nums">
-                            {value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                           </td>
                         </tr>
                       )
@@ -924,27 +1053,14 @@ export default function TimesheetPage() {
                   <tfoot>
                     <tr className="border-t-2 border-border bg-secondary/60">
                       <td className="px-5 py-3 text-[13px] font-bold text-foreground">Total</td>
-                      <td className="px-4 py-3 text-right text-[13px] font-bold text-foreground tabular-nums">
-                        {Object.values(PLANNED_HOURS).reduce((s, v) => s + v, 0)}h
-                      </td>
                       <td className="px-4 py-3 text-right text-[13px] font-bold text-primary tabular-nums">
                         {Math.round(totalReportHours * 10) / 10}h
                       </td>
                       <td className="px-4 py-3 text-right text-[13px] font-bold text-foreground tabular-nums">
-                        {Math.round(
-                          (totalReportHours /
-                            Object.values(PLANNED_HOURS).reduce((s, v) => s + v, 0)) *
-                            100
-                        )}%
+                        {reportEntries.length}
                       </td>
                       <td className="px-5 py-3 text-right text-[13px] font-bold text-foreground tabular-nums">
-                        {CLIENTS.reduce((sum, client) => {
-                          const realized =
-                            reportEntries
-                              .filter((e) => e.client === client)
-                              .reduce((s, e) => s + e.duration, 0) / 60
-                          return sum + Math.round(realized * (RATE_PER_HOUR[client] || 200))
-                        }, 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                        100%
                       </td>
                     </tr>
                   </tfoot>
@@ -982,7 +1098,7 @@ export default function TimesheetPage() {
                   <SelectValue placeholder="Selecione o cliente..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {CLIENTS.map((c) => (
+                  {CLIENT_NAMES.map((c) => (
                     <SelectItem key={c} value={c}>{c}</SelectItem>
                   ))}
                 </SelectContent>

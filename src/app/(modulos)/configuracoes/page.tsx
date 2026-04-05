@@ -105,13 +105,13 @@ export default function ConfiguracoesPage() {
   const { clienteAtivo } = useClienteContext()
   // ClickUp state
   const [clickup, setClickup] = useState<ClickUpConfig>({
-    apiKey: "pk_12345678_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-    workspaceId: "9876543",
-    spaceId: "123456789",
-    autoCreate: true,
+    apiKey: "",
+    workspaceId: "",
+    spaceId: "",
+    autoCreate: false,
     autoUpdate: false,
-    autoImport: true,
-    status: "conectado",
+    autoImport: false,
+    status: "desconectado",
   })
   const [showApiKey, setShowApiKey] = useState(false)
   const [testResult, setTestResult] = useState<string | null>(null)

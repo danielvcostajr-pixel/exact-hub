@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import Link from "next/link"
 import {
   List,
@@ -35,8 +35,16 @@ import {
   StatusTarefa,
   STATUS_CONFIG,
   PRIORIDADE_CONFIG,
+  Usuario,
 } from "@/components/tarefas/tarefas-types"
-import { getTarefasByEmpresa } from "@/lib/api/data-service"
+import {
+  getTarefasByEmpresa,
+  createTarefa,
+  updateTarefa,
+  deleteTarefa,
+  getCurrentUserId,
+  getUsuarios,
+} from "@/lib/api/data-service"
 
 type ViewType = "lista" | "kanban" | "calendario" | "gantt"
 
@@ -47,23 +55,65 @@ const VIEWS: { id: ViewType; label: string; icon: React.ElementType }[] = [
   { id: "gantt", label: "Gantt", icon: GanttChartSquare },
 ]
 
-const RESPONSAVEIS = ["Daniel Vieira", "Ana Silva", "Carlos Mendes", "Roberto Lima"]
+/** Map a DB row (with joined responsavel) into the local Tarefa shape */
+function mapDbTarefa(row: Record<string, unknown>): Tarefa {
+  const resp = row.responsavel as { id: string; nome: string } | null
+  return {
+    id: row.id as string,
+    titulo: (row.titulo as string) ?? "",
+    descricao: (row.descricao as string) ?? "",
+    status: (row.status as StatusTarefa) ?? "BACKLOG",
+    prioridade: (row.prioridade as Tarefa["prioridade"]) ?? "MEDIA",
+    responsavel: resp?.nome ?? "Sem responsavel",
+    responsavelId: (row.responsavelId as string) ?? resp?.id ?? null,
+    dataInicio: (row.dataInicio as string) ?? "",
+    prazo: (row.prazo as string) ?? "",
+    estimativaHoras: (row.estimativaHoras as number) ?? 0,
+    horasTrabalhadas: (row.horasTrabalhadas as number) ?? 0,
+    progresso: 0,
+    checklist: [],
+    comentarios: [],
+    anexos: [],
+    atividades: [],
+    comentariosCount: 0,
+    anexosCount: 0,
+    okrId: (row.okrId as string) ?? undefined,
+    acaoId: (row.acaoId as string) ?? undefined,
+    empresaId: (row.empresaId as string) ?? undefined,
+  }
+}
 
 export default function TarefasPage() {
   const { clienteAtivo, isFiltered } = useClienteContext()
   const [tarefas, setTarefas] = useState<Tarefa[]>([])
   const [loading, setLoading] = useState(true)
   const [activeView, setActiveView] = useState<ViewType>("lista")
+  const [usuarios, setUsuarios] = useState<Usuario[]>([])
 
+  // Load usuarios from Supabase
   useEffect(() => {
-    if (clienteAtivo) {
-      setLoading(true)
-      getTarefasByEmpresa(clienteAtivo.id)
-        .then((data) => setTarefas(data as unknown as Tarefa[]))
-        .catch(() => setTarefas([]))
-        .finally(() => setLoading(false))
+    getUsuarios()
+      .then((data) => setUsuarios(data as Usuario[]))
+      .catch(() => setUsuarios([]))
+  }, [])
+
+  const loadTarefas = useCallback(async () => {
+    if (!clienteAtivo) return
+    setLoading(true)
+    try {
+      const data = await getTarefasByEmpresa(clienteAtivo.id)
+      setTarefas((data as Record<string, unknown>[]).map(mapDbTarefa))
+    } catch {
+      setTarefas([])
+    } finally {
+      setLoading(false)
     }
   }, [clienteAtivo])
+
+  useEffect(() => {
+    loadTarefas()
+  }, [loadTarefas])
+
   const [selectedTarefa, setSelectedTarefa] = useState<Tarefa | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
@@ -80,7 +130,7 @@ export default function TarefasPage() {
   const tarefasFiltradas = useMemo(() => {
     return tarefas.filter((t) => {
       if (filtroStatus !== "TODOS" && t.status !== filtroStatus) return false
-      if (filtroResponsavel !== "TODOS" && t.responsavel !== filtroResponsavel) return false
+      if (filtroResponsavel !== "TODOS" && t.responsavelId !== filtroResponsavel) return false
       if (filtroPrioridade !== "TODOS" && t.prioridade !== filtroPrioridade) return false
       if (filtroPrazoInicio && t.prazo < filtroPrazoInicio) return false
       if (filtroPrazoFim && t.prazo > filtroPrazoFim) return false
@@ -99,43 +149,71 @@ export default function TarefasPage() {
     setSelectedTarefa(tarefa)
   }
 
-  function handleUpdateTarefa(updated: Tarefa) {
-    setTarefas((prev) =>
-      prev.map((t) => (t.id === updated.id ? updated : t))
-    )
-    setSelectedTarefa(updated)
+  async function handleUpdateTarefa(updated: Tarefa) {
+    try {
+      await updateTarefa(updated.id, {
+        titulo: updated.titulo,
+        descricao: updated.descricao,
+        status: updated.status,
+        prioridade: updated.prioridade,
+        responsavelId: updated.responsavelId || null,
+        dataInicio: updated.dataInicio || null,
+        prazo: updated.prazo || null,
+        estimativaHoras: updated.estimativaHoras,
+      })
+      // Reload from DB to stay in sync
+      await loadTarefas()
+      // Keep selected tarefa updated
+      setSelectedTarefa((prev) => {
+        if (!prev || prev.id !== updated.id) return prev
+        return updated
+      })
+    } catch (err) {
+      console.error("Erro ao atualizar tarefa:", err)
+    }
   }
 
-  function handleUpdateStatus(tarefaId: string, newStatus: StatusTarefa) {
-    setTarefas((prev) =>
-      prev.map((t) => (t.id === tarefaId ? { ...t, status: newStatus } : t))
-    )
+  async function handleUpdateStatus(tarefaId: string, newStatus: StatusTarefa) {
+    try {
+      const updates: Record<string, unknown> = { status: newStatus }
+      if (newStatus === "CONCLUIDA") {
+        updates.dataConclusao = new Date().toISOString()
+      }
+      await updateTarefa(tarefaId, updates)
+      await loadTarefas()
+    } catch (err) {
+      console.error("Erro ao atualizar status:", err)
+    }
   }
 
-  function handleCreateTarefa(
+  async function handleCreateTarefa(
     data: Omit<
       Tarefa,
       "id" | "comentarios" | "anexos" | "atividades" | "horasTrabalhadas" | "comentariosCount" | "anexosCount"
     >
   ) {
-    const novaTarefa: Tarefa = {
-      ...data,
-      id: `t-${Date.now()}`,
-      comentarios: [],
-      anexos: [],
-      atividades: [
-        {
-          id: `at-${Date.now()}`,
-          acao: "Tarefa criada",
-          usuario: "Daniel Vieira",
-          data: new Date().toISOString().split("T")[0],
-        },
-      ],
-      horasTrabalhadas: 0,
-      comentariosCount: 0,
-      anexosCount: 0,
+    if (!clienteAtivo) return
+    try {
+      const userId = await getCurrentUserId()
+      if (!userId) {
+        console.error("Usuario nao autenticado")
+        return
+      }
+      await createTarefa({
+        empresaId: clienteAtivo.id,
+        titulo: data.titulo,
+        descricao: data.descricao || undefined,
+        status: data.status,
+        prioridade: data.prioridade,
+        prazo: data.prazo || undefined,
+        responsavelId: data.responsavelId || undefined,
+        criadoPorId: userId,
+      })
+      // Reload tasks from DB
+      await loadTarefas()
+    } catch (err) {
+      console.error("Erro ao criar tarefa:", err)
     }
-    setTarefas((prev) => [novaTarefa, ...prev])
   }
 
   function clearFilters() {
@@ -208,7 +286,12 @@ export default function TarefasPage() {
             Criar Primeira Tarefa
           </Button>
         </div>
-        <FormTarefa open={showForm} onClose={() => setShowForm(false)} onSave={handleCreateTarefa} />
+        <FormTarefa
+          open={showForm}
+          onClose={() => setShowForm(false)}
+          onSave={handleCreateTarefa}
+          usuarios={usuarios}
+        />
       </div>
     )
   }
@@ -331,9 +414,9 @@ export default function TarefasPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="TODOS">Todos</SelectItem>
-                  {RESPONSAVEIS.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {r}
+                  {usuarios.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -367,7 +450,7 @@ export default function TarefasPage() {
                 placeholder="De"
                 title="Prazo inicial"
               />
-              <span className="text-muted-foreground text-xs">até</span>
+              <span className="text-muted-foreground text-xs">ate</span>
               <Input
                 type="date"
                 value={filtroPrazoFim}
@@ -433,6 +516,7 @@ export default function TarefasPage() {
         open={selectedTarefa !== null}
         onClose={() => setSelectedTarefa(null)}
         onUpdate={handleUpdateTarefa}
+        usuarios={usuarios}
       />
 
       {/* Create Form */}
@@ -440,6 +524,7 @@ export default function TarefasPage() {
         open={showForm}
         onClose={() => setShowForm(false)}
         onSave={handleCreateTarefa}
+        usuarios={usuarios}
       />
     </div>
   )

@@ -42,6 +42,7 @@ import {
   STATUS_CONFIG,
   PRIORIDADE_CONFIG,
   ChecklistItem,
+  Usuario,
 } from "./tarefas-types"
 import { cn } from "@/lib/utils"
 
@@ -50,6 +51,7 @@ interface TarefaDetailPanelProps {
   open: boolean
   onClose: () => void
   onUpdate?: (tarefa: Tarefa) => void
+  usuarios?: Usuario[]
 }
 
 type Tab = "detalhes" | "checklist" | "comentarios" | "anexos" | "atividades"
@@ -63,13 +65,12 @@ function getInitials(name: string) {
     .toUpperCase()
 }
 
-const RESPONSAVEIS = ["Daniel Vieira", "Ana Silva", "Carlos Mendes", "Roberto Lima"]
-
 export default function TarefaDetailPanel({
   tarefa,
   open,
   onClose,
   onUpdate,
+  usuarios = [],
 }: TarefaDetailPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>("detalhes")
   const [editedTarefa, setEditedTarefa] = useState<Tarefa | null>(null)
@@ -115,7 +116,7 @@ export default function TarefaDetailPanel({
     if (!newComment.trim()) return
     const comment = {
       id: `cm-${Date.now()}`,
-      autor: "Daniel Vieira",
+      autor: "Voce",
       texto: newComment.trim(),
       data: new Date().toISOString().split("T")[0],
     }
@@ -124,6 +125,14 @@ export default function TarefaDetailPanel({
       comentariosCount: current!.comentariosCount + 1,
     })
     setNewComment("")
+  }
+
+  function handleResponsavelChange(userId: string) {
+    const user = usuarios.find((u) => u.id === userId)
+    update({
+      responsavelId: userId,
+      responsavel: user?.nome ?? "Sem responsavel",
+    })
   }
 
   const completedCheckItems = current.checklist.filter((i) => i.concluido).length
@@ -317,16 +326,16 @@ export default function TarefaDetailPanel({
                     Responsavel
                   </Label>
                   <Select
-                    value={current.responsavel}
-                    onValueChange={(v) => update({ responsavel: v })}
+                    value={current.responsavelId ?? ""}
+                    onValueChange={handleResponsavelChange}
                   >
                     <SelectTrigger className="h-8 text-sm">
-                      <SelectValue />
+                      <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {RESPONSAVEIS.map((r) => (
-                        <SelectItem key={r} value={r}>
-                          {r}
+                      {usuarios.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.nome}
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -1,37 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, RotateCcw, Copy, ArrowLeft } from 'lucide-react'
+import { Plus, RotateCcw, Copy, ArrowLeft, Loader2, X } from 'lucide-react'
 import { useClienteContext } from '@/hooks/useClienteContext'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { RotinaCard, type Rotina } from '@/components/planejamento/RotinaCard'
 import { ROTINAS_TEMPLATES, type RotinaTemplate } from '@/lib/templates/rotinas'
-
-function gerarId() {
-  return Math.random().toString(36).substring(2, 10)
-}
-
-function templateParaRotina(tpl: RotinaTemplate): Rotina {
-  return {
-    id: gerarId(),
-    nome: tpl.nome,
-    descricao: tpl.descricao,
-    categoria: tpl.categoria as Rotina['categoria'],
-    frequencia: tpl.frequencia as Rotina['frequencia'],
-    diaExecucao: tpl.diaExecucao,
-    proximaExecucao: 'A definir',
-    itens: tpl.itens.map((it) => ({
-      id: gerarId(),
-      descricao: it.descricao,
-      obrigatorio: it.obrigatorio,
-      tipo: it.tipo,
-      dica: it.dica,
-    })),
-  }
-}
+import { getRotinasByEmpresa, createRotina, createItemControle, getCurrentUserId } from '@/lib/api/data-service'
 
 const FREQ_COLORS: Record<string, string> = {
   DIARIA: 'bg-purple-500/15 text-purple-500 border-purple-500/30',
@@ -55,19 +38,136 @@ const CAT_COLORS: Record<string, string> = {
   Marketing: 'bg-violet-500/15 text-violet-500 border-violet-500/30',
 }
 
+function gerarId() {
+  return Math.random().toString(36).substring(2, 10)
+}
+
+function dbToRotina(row: Record<string, unknown>): Rotina {
+  const itens = (row.ItemControle as Array<Record<string, unknown>> | undefined) ?? []
+  return {
+    id: row.id as string,
+    nome: row.nome as string,
+    descricao: (row.descricao as string) ?? '',
+    categoria: (row.categoria as Rotina['categoria']) ?? 'Operacional',
+    frequencia: (row.frequencia as Rotina['frequencia']) ?? 'SEMANAL',
+    diaExecucao: row.hora ? `${row.hora}` : row.diaSemana != null ? `Dia ${row.diaSemana}` : row.diaMes != null ? `Dia ${row.diaMes}` : 'A definir',
+    proximaExecucao: 'A definir',
+    itens: itens.map((it) => ({
+      id: it.id as string,
+      descricao: it.descricao as string,
+      obrigatorio: (it.obrigatorio as boolean) ?? false,
+      tipo: (it.tipo as 'CHECK' | 'NUMERO' | 'TEXTO') ?? 'CHECK',
+      dica: it.dica as string | undefined,
+    })),
+  }
+}
+
 export default function RotinasPage() {
   const { clienteAtivo, isFiltered } = useClienteContext()
   const [rotinas, setRotinas] = useState<Rotina[]>([])
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [finalizadas, setFinalizadas] = useState<Set<string>>(new Set())
+
+  // Dialog state
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [formNome, setFormNome] = useState('')
+  const [formDescricao, setFormDescricao] = useState('')
+  const [formFrequencia, setFormFrequencia] = useState('SEMANAL')
+  const [formCategoria, setFormCategoria] = useState('Operacional')
+  const [formHora, setFormHora] = useState('')
+
+  const loadRotinas = useCallback(async () => {
+    if (!clienteAtivo) return
+    setLoading(true)
+    try {
+      const data = await getRotinasByEmpresa(clienteAtivo.id)
+      setRotinas((data ?? []).map(dbToRotina))
+    } catch (err) {
+      console.error('Erro ao carregar rotinas:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [clienteAtivo])
+
+  useEffect(() => {
+    loadRotinas()
+  }, [loadRotinas])
 
   function handleFinalizar(rotinaId: string) {
     setFinalizadas((prev) => { const next = new Set(Array.from(prev)); next.add(rotinaId); return next })
   }
 
-  function handleUsarTemplate(tpl: RotinaTemplate) {
-    const novaRotina = templateParaRotina(tpl)
-    setRotinas((prev) => [novaRotina, ...prev])
+  async function handleUsarTemplate(tpl: RotinaTemplate) {
+    if (!clienteAtivo) return
+    setSaving(true)
+    try {
+      const userId = await getCurrentUserId()
+      if (!userId) { alert('Usuario nao autenticado'); return }
+
+      const novaRotina = await createRotina({
+        empresaId: clienteAtivo.id,
+        nome: tpl.nome,
+        descricao: tpl.descricao,
+        frequencia: tpl.frequencia,
+        categoria: tpl.categoria,
+        responsavelId: userId,
+      })
+
+      // Create item controle entries
+      for (let i = 0; i < tpl.itens.length; i++) {
+        await createItemControle({
+          rotinaId: novaRotina.id,
+          descricao: tpl.itens[i].descricao,
+          ordem: i + 1,
+          obrigatorio: tpl.itens[i].obrigatorio,
+        })
+      }
+
+      await loadRotinas()
+    } catch (err) {
+      console.error('Erro ao usar template:', err)
+      alert('Erro ao criar rotina a partir do template.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function openDialog() {
+    setFormNome('')
+    setFormDescricao('')
+    setFormFrequencia('SEMANAL')
+    setFormCategoria('Operacional')
+    setFormHora('')
+    setDialogOpen(true)
+  }
+
+  async function handleCriarRotina() {
+    if (!clienteAtivo || !formNome.trim()) return
+    setSaving(true)
+    try {
+      const userId = await getCurrentUserId()
+      if (!userId) { alert('Usuario nao autenticado'); return }
+
+      await createRotina({
+        empresaId: clienteAtivo.id,
+        nome: formNome.trim(),
+        descricao: formDescricao.trim() || undefined,
+        frequencia: formFrequencia,
+        categoria: formCategoria,
+        hora: formHora || undefined,
+        responsavelId: userId,
+      })
+
+      setDialogOpen(false)
+      await loadRotinas()
+    } catch (err) {
+      console.error('Erro ao criar rotina:', err)
+      alert('Erro ao criar rotina.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (!isFiltered) {
@@ -99,6 +199,7 @@ export default function RotinasPage() {
           </p>
         </div>
         <Button
+          onClick={openDialog}
           className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white gap-2 shrink-0"
         >
           <Plus size={16} />
@@ -106,120 +207,214 @@ export default function RotinasPage() {
         </Button>
       </div>
 
+      {/* Loading */}
+      {loading && (
+        <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
+          <Loader2 size={18} className="animate-spin" />
+          <span className="text-sm">Carregando rotinas...</span>
+        </div>
+      )}
+
       {/* Tabs */}
-      <Tabs defaultValue="minhas" className="w-full">
-        <TabsList className="bg-card border border-border">
-          <TabsTrigger
-            value="minhas"
-            className="data-[state=active]:bg-primary data-[state=active]:text-white text-muted-foreground"
-          >
-            Minhas Rotinas
-            <Badge
-              variant="outline"
-              className="ml-2 border-border text-muted-foreground text-[10px] px-1.5 py-0 h-4"
+      {!loading && (
+        <Tabs defaultValue="minhas" className="w-full">
+          <TabsList className="bg-card border border-border">
+            <TabsTrigger
+              value="minhas"
+              className="data-[state=active]:bg-primary data-[state=active]:text-white text-muted-foreground"
             >
-              {rotinas.length}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger
-            value="templates"
-            className="data-[state=active]:bg-primary data-[state=active]:text-white text-muted-foreground"
-          >
-            Templates
-            <Badge
-              variant="outline"
-              className="ml-2 border-border text-muted-foreground text-[10px] px-1.5 py-0 h-4"
-            >
-              {ROTINAS_TEMPLATES.length}
-            </Badge>
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Minhas Rotinas */}
-        <TabsContent value="minhas" className="mt-4">
-          <div className="flex flex-col gap-3">
-            {rotinas.map((rotina) => (
-              <RotinaCard
-                key={rotina.id}
-                rotina={rotina}
-                onFinalizar={handleFinalizar}
-              />
-            ))}
-            {rotinas.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border rounded-xl">
-                <RotateCcw size={36} className="text-muted-foreground/40 mb-3" />
-                <p className="text-muted-foreground font-medium">Nenhuma rotina criada</p>
-                <p className="text-sm text-muted-foreground/60 mt-1">
-                  Crie uma rotina ou use um template
-                </p>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        {/* Templates */}
-        <TabsContent value="templates" className="mt-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {ROTINAS_TEMPLATES.map((tpl) => (
-              <div
-                key={tpl.id}
-                className="rounded-xl border border-border bg-card p-5 flex flex-col gap-3 hover:shadow-md transition-shadow"
+              Minhas Rotinas
+              <Badge
+                variant="outline"
+                className="ml-2 border-border text-muted-foreground text-[10px] px-1.5 py-0 h-4"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="text-base font-semibold text-foreground leading-snug">{tpl.nome}</h3>
-                </div>
-                <p className="text-sm text-muted-foreground line-clamp-3">{tpl.descricao}</p>
+                {rotinas.length}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger
+              value="templates"
+              className="data-[state=active]:bg-primary data-[state=active]:text-white text-muted-foreground"
+            >
+              Templates
+              <Badge
+                variant="outline"
+                className="ml-2 border-border text-muted-foreground text-[10px] px-1.5 py-0 h-4"
+              >
+                {ROTINAS_TEMPLATES.length}
+              </Badge>
+            </TabsTrigger>
+          </TabsList>
 
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge
-                    variant="outline"
-                    className={`text-[11px] border px-2 py-0 ${FREQ_COLORS[tpl.frequencia]}`}
-                  >
-                    {FREQ_LABELS[tpl.frequencia]}
-                  </Badge>
-                  <Badge
-                    variant="outline"
-                    className={`text-[11px] border px-2 py-0 ${CAT_COLORS[tpl.categoria]}`}
-                  >
-                    {tpl.categoria}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground ml-auto">
-                    {tpl.itens.length} itens
-                  </span>
+          {/* Minhas Rotinas */}
+          <TabsContent value="minhas" className="mt-4">
+            <div className="flex flex-col gap-3">
+              {rotinas.map((rotina) => (
+                <RotinaCard
+                  key={rotina.id}
+                  rotina={rotina}
+                  onFinalizar={handleFinalizar}
+                />
+              ))}
+              {rotinas.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border rounded-xl">
+                  <RotateCcw size={36} className="text-muted-foreground/40 mb-3" />
+                  <p className="text-muted-foreground font-medium">Nenhuma rotina criada</p>
+                  <p className="text-sm text-muted-foreground/60 mt-1">
+                    Crie uma rotina ou use um template
+                  </p>
                 </div>
+              )}
+            </div>
+          </TabsContent>
 
-                <div className="flex flex-col gap-1.5">
-                  {tpl.itens.slice(0, 3).map((it, idx) => (
-                    <div key={idx} className="flex items-start gap-1.5">
-                      <span className="text-muted-foreground/50 text-xs mt-0.5">•</span>
-                      <span className="text-xs text-muted-foreground line-clamp-1">{it.descricao}</span>
-                      {it.obrigatorio && (
-                        <span className="text-red-500 text-xs font-bold shrink-0">*</span>
-                      )}
-                    </div>
-                  ))}
-                  {tpl.itens.length > 3 && (
-                    <span className="text-xs text-muted-foreground/50 ml-3">
-                      + {tpl.itens.length - 3} mais...
+          {/* Templates */}
+          <TabsContent value="templates" className="mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {ROTINAS_TEMPLATES.map((tpl) => (
+                <div
+                  key={tpl.id}
+                  className="rounded-xl border border-border bg-card p-5 flex flex-col gap-3 hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="text-base font-semibold text-foreground leading-snug">{tpl.nome}</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground line-clamp-3">{tpl.descricao}</p>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge
+                      variant="outline"
+                      className={`text-[11px] border px-2 py-0 ${FREQ_COLORS[tpl.frequencia]}`}
+                    >
+                      {FREQ_LABELS[tpl.frequencia]}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className={`text-[11px] border px-2 py-0 ${CAT_COLORS[tpl.categoria]}`}
+                    >
+                      {tpl.categoria}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      {tpl.itens.length} itens
                     </span>
-                  )}
-                </div>
+                  </div>
 
-                <div className="pt-1">
-                  <Button
-                    size="sm"
-                    onClick={() => handleUsarTemplate(tpl)}
-                    className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white gap-1.5 h-8 text-xs"
-                  >
-                    <Copy size={12} />
-                    Usar Template
-                  </Button>
+                  <div className="flex flex-col gap-1.5">
+                    {tpl.itens.slice(0, 3).map((it, idx) => (
+                      <div key={idx} className="flex items-start gap-1.5">
+                        <span className="text-muted-foreground/50 text-xs mt-0.5">•</span>
+                        <span className="text-xs text-muted-foreground line-clamp-1">{it.descricao}</span>
+                        {it.obrigatorio && (
+                          <span className="text-red-500 text-xs font-bold shrink-0">*</span>
+                        )}
+                      </div>
+                    ))}
+                    {tpl.itens.length > 3 && (
+                      <span className="text-xs text-muted-foreground/50 ml-3">
+                        + {tpl.itens.length - 3} mais...
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="pt-1">
+                    <Button
+                      size="sm"
+                      disabled={saving}
+                      onClick={() => handleUsarTemplate(tpl)}
+                      className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white gap-1.5 h-8 text-xs"
+                    >
+                      {saving ? <Loader2 size={12} className="animate-spin" /> : <Copy size={12} />}
+                      Usar Template
+                    </Button>
+                  </div>
                 </div>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
+      )}
+
+      {/* Dialog Nova Rotina */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nova Rotina</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 py-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="rotina-nome">Nome *</Label>
+              <Input
+                id="rotina-nome"
+                placeholder="Ex: Fechamento Financeiro"
+                value={formNome}
+                onChange={(e) => setFormNome(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="rotina-desc">Descricao</Label>
+              <Textarea
+                id="rotina-desc"
+                placeholder="Descreva a rotina..."
+                value={formDescricao}
+                onChange={(e) => setFormDescricao(e.target.value)}
+                className="resize-none h-20"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label>Frequencia</Label>
+                <Select value={formFrequencia} onValueChange={setFormFrequencia}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DIARIA">Diaria</SelectItem>
+                    <SelectItem value="SEMANAL">Semanal</SelectItem>
+                    <SelectItem value="QUINZENAL">Quinzenal</SelectItem>
+                    <SelectItem value="MENSAL">Mensal</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            ))}
+              <div className="flex flex-col gap-1.5">
+                <Label>Categoria</Label>
+                <Select value={formCategoria} onValueChange={setFormCategoria}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Financeiro">Financeiro</SelectItem>
+                    <SelectItem value="Comercial">Comercial</SelectItem>
+                    <SelectItem value="Operacional">Operacional</SelectItem>
+                    <SelectItem value="RH">RH</SelectItem>
+                    <SelectItem value="Marketing">Marketing</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="rotina-hora">Horario (opcional)</Label>
+              <Input
+                id="rotina-hora"
+                type="time"
+                value={formHora}
+                onChange={(e) => setFormHora(e.target.value)}
+              />
+            </div>
           </div>
-        </TabsContent>
-      </Tabs>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={!formNome.trim() || saving}
+              onClick={handleCriarRotina}
+              className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white gap-1.5"
+            >
+              {saving && <Loader2 size={14} className="animate-spin" />}
+              Criar Rotina
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

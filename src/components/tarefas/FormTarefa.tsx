@@ -27,6 +27,7 @@ import {
   STATUS_CONFIG,
   PRIORIDADE_CONFIG,
   ChecklistItem,
+  Usuario,
 } from "./tarefas-types"
 import { cn } from "@/lib/utils"
 
@@ -35,16 +36,15 @@ interface FormTarefaProps {
   onClose: () => void
   onSave: (tarefa: Omit<Tarefa, "id" | "comentarios" | "anexos" | "atividades" | "horasTrabalhadas" | "comentariosCount" | "anexosCount">) => void
   initialData?: Partial<Tarefa>
+  usuarios?: Usuario[]
 }
-
-const RESPONSAVEIS = ["Daniel Vieira", "Ana Silva", "Carlos Mendes", "Roberto Lima"]
 
 const DEFAULT_FORM = {
   titulo: "",
   descricao: "",
   status: "A_FAZER" as StatusTarefa,
   prioridade: "MEDIA" as PrioridadeTarefa,
-  responsavel: "Daniel Vieira",
+  responsavelId: "",
   dataInicio: new Date().toISOString().split("T")[0],
   prazo: "",
   estimativaHoras: 8,
@@ -59,6 +59,7 @@ export default function FormTarefa({
   onClose,
   onSave,
   initialData,
+  usuarios = [],
 }: FormTarefaProps) {
   const [form, setForm] = useState({ ...DEFAULT_FORM, ...initialData })
   const [newCheckItem, setNewCheckItem] = useState("")
@@ -103,19 +104,21 @@ export default function FormTarefa({
     const newErrors: Record<string, string> = {}
     if (!form.titulo.trim()) newErrors.titulo = "Titulo e obrigatorio"
     if (!form.prazo) newErrors.prazo = "Prazo e obrigatorio"
-    if (!form.responsavel) newErrors.responsavel = "Responsavel e obrigatorio"
+    if (!form.responsavelId) newErrors.responsavelId = "Responsavel e obrigatorio"
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
   function handleSave() {
     if (!validate()) return
+    const selectedUser = usuarios.find((u) => u.id === form.responsavelId)
     onSave({
       titulo: form.titulo,
       descricao: form.descricao,
       status: form.status,
       prioridade: form.prioridade,
-      responsavel: form.responsavel,
+      responsavel: selectedUser?.nome ?? "",
+      responsavelId: form.responsavelId,
       dataInicio: form.dataInicio,
       prazo: form.prazo,
       estimativaHoras: form.estimativaHoras,
@@ -224,22 +227,22 @@ export default function FormTarefa({
                 Responsavel <span className="text-red-500">*</span>
               </Label>
               <Select
-                value={form.responsavel}
-                onValueChange={(v) => updateField("responsavel", v)}
+                value={form.responsavelId}
+                onValueChange={(v) => updateField("responsavelId", v)}
               >
-                <SelectTrigger className={cn(errors.responsavel && "border-red-500")}>
-                  <SelectValue />
+                <SelectTrigger className={cn(errors.responsavelId && "border-red-500")}>
+                  <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {RESPONSAVEIS.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {r}
+                  {usuarios.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {errors.responsavel && (
-                <p className="text-xs text-red-500">{errors.responsavel}</p>
+              {errors.responsavelId && (
+                <p className="text-xs text-red-500">{errors.responsavelId}</p>
               )}
             </div>
 
