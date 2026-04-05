@@ -107,19 +107,19 @@ export async function POST(request: NextRequest) {
     const hoje = new Date().toISOString().split('T')[0]
     const diaSemana = new Date().toLocaleDateString('pt-BR', { weekday: 'long' })
 
-    const apiKey = process.env.KIMI_API_KEY
+    const apiKey = process.env.OPENROUTER_API_KEY
     if (!apiKey || apiKey === 'placeholder') {
       return NextResponse.json(fallbackParse(transcricao))
     }
 
-    // Kimi K2.5 via OpenAI-compatible API (Moonshot)
-    const kimi = new OpenAI({
+    // Kimi K2 Free via OpenRouter (custo $0)
+    const openrouter = new OpenAI({
       apiKey,
-      baseURL: 'https://api.moonshot.cn/v1',
+      baseURL: 'https://openrouter.ai/api/v1',
     })
 
-    const completion = await kimi.chat.completions.create({
-      model: 'kimi-k2-0711',
+    const completion = await openrouter.chat.completions.create({
+      model: 'moonshotai/kimi-k2:free',
       temperature: 0.3,
       max_tokens: 8192,
       messages: [
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(parsed)
   } catch (err) {
     console.error('Erro na análise de reunião:', err)
-    return NextResponse.json({ error: 'Erro ao processar transcricao. Verifique a KIMI_API_KEY.' }, { status: 500 })
+    return NextResponse.json({ error: 'Erro ao processar transcricao. Verifique a OPENROUTER_API_KEY.' }, { status: 500 })
   }
 }
 
@@ -232,7 +232,7 @@ function fallbackParse(text: string) {
   }
 
   return {
-    resumo: 'Analise realizada por extracao de padroes (configure a KIMI_API_KEY para analise com IA). Revise as tarefas extraidas.',
+    resumo: 'Analise realizada por extracao de padroes (configure a OPENROUTER_API_KEY para analise com IA). Revise as tarefas extraidas.',
     pauta: [],
     decisoes: [],
     tarefas,
