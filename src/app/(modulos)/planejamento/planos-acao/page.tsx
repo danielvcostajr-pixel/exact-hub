@@ -40,6 +40,7 @@ interface PlanoAcao {
 }
 
 const STATUS_MAP: Record<string, StatusAcao> = {
+  NAO_INICIADA: 'Pendente',
   PENDENTE: 'Pendente',
   EM_ANDAMENTO: 'Em Andamento',
   CONCLUIDA: 'Concluida',
@@ -98,10 +99,10 @@ function dbToPlano(row: Record<string, unknown>): PlanoAcao {
 }
 
 const DB_STATUS_VALUES: Record<StatusAcao, string> = {
-  Pendente: 'PENDENTE',
+  Pendente: 'NAO_INICIADA',
   'Em Andamento': 'EM_ANDAMENTO',
   Concluida: 'CONCLUIDA',
-  Bloqueada: 'CANCELADA',
+  Bloqueada: 'BLOQUEADA',
 }
 
 function PlanoCard({ plano, usuarios, empresaId, onReload }: { plano: PlanoAcao; usuarios: UsuarioRaci[]; empresaId: string; onReload: () => Promise<void> }) {
@@ -110,7 +111,7 @@ function PlanoCard({ plano, usuarios, empresaId, onReload }: { plano: PlanoAcao;
   const [showNovaAcao, setShowNovaAcao] = useState(false)
   const [novaAcaoDesc, setNovaAcaoDesc] = useState('')
   const [novaAcaoPrazo, setNovaAcaoPrazo] = useState('')
-  const [novaAcaoStatus, setNovaAcaoStatus] = useState('PENDENTE')
+  const [novaAcaoStatus, setNovaAcaoStatus] = useState('NAO_INICIADA')
   const [novaAcaoResponsavel, setNovaAcaoResponsavel] = useState('')
   const [novaAcaoPrioridade, setNovaAcaoPrioridade] = useState('MEDIA')
   const [salvandoAcao, setSalvandoAcao] = useState(false)
@@ -129,21 +130,23 @@ function PlanoCard({ plano, usuarios, empresaId, onReload }: { plano: PlanoAcao;
     if (!novaAcaoDesc.trim()) return
     setSalvandoAcao(true)
     try {
-      // 1. Create the acao in PlanoAcao
+      // 1. Create the acao in PlanoAcao (DB enum: NAO_INICIADA, EM_ANDAMENTO, CONCLUIDA, BLOQUEADA)
+      const dbAcaoStatus = novaAcaoStatus === 'PENDENTE' ? 'NAO_INICIADA' : novaAcaoStatus
       await createAcao({
         planoId: plano.id,
         descricao: novaAcaoDesc.trim(),
         prazo: novaAcaoPrazo || undefined,
-        status: novaAcaoStatus,
+        status: dbAcaoStatus,
       })
 
-      // 2. Also create a Tarefa linked to the OKR (if plano has okrVinculadoId)
+      // 2. Also create a Tarefa (DB enum: BACKLOG, A_FAZER, EM_PROGRESSO, REVISAO, CONCLUIDA, CANCELADA)
       const userId = await getCurrentUserId()
+      const tarefaStatus = novaAcaoStatus === 'CONCLUIDA' ? 'CONCLUIDA' : 'A_FAZER'
       await createTarefa({
         empresaId,
         titulo: novaAcaoDesc.trim(),
         descricao: `Plano: ${plano.titulo}`,
-        status: novaAcaoStatus === 'CONCLUIDA' ? 'CONCLUIDA' : 'A_FAZER',
+        status: tarefaStatus,
         prioridade: novaAcaoPrioridade,
         prazo: novaAcaoPrazo || undefined,
         responsavelId: novaAcaoResponsavel || undefined,
@@ -153,7 +156,7 @@ function PlanoCard({ plano, usuarios, empresaId, onReload }: { plano: PlanoAcao;
 
       setNovaAcaoDesc('')
       setNovaAcaoPrazo('')
-      setNovaAcaoStatus('PENDENTE')
+      setNovaAcaoStatus('NAO_INICIADA')
       setNovaAcaoResponsavel('')
       setNovaAcaoPrioridade('MEDIA')
       setShowNovaAcao(false)
@@ -169,7 +172,7 @@ function PlanoCard({ plano, usuarios, empresaId, onReload }: { plano: PlanoAcao;
   async function handleToggleConcluida(acao: Acao) {
     setUpdatingAcaoId(acao.id)
     try {
-      const newStatus = acao.status === 'Concluida' ? 'PENDENTE' : 'CONCLUIDA'
+      const newStatus = acao.status === 'Concluida' ? 'NAO_INICIADA' : 'CONCLUIDA'
       await updateAcao(acao.id, { status: newStatus })
       await onReload()
     } catch (err) {
@@ -390,16 +393,16 @@ function PlanoCard({ plano, usuarios, empresaId, onReload }: { plano: PlanoAcao;
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="PENDENTE">Pendente</SelectItem>
+                          <SelectItem value="NAO_INICIADA">Pendente</SelectItem>
                           <SelectItem value="EM_ANDAMENTO">Em Andamento</SelectItem>
                           <SelectItem value="CONCLUIDA">Concluida</SelectItem>
-                          <SelectItem value="CANCELADA">Cancelada</SelectItem>
+                          <SelectItem value="BLOQUEADA">Bloqueada</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
                   <p className="text-[10px] text-muted-foreground">
-                    Esta acao sera criada tambem como tarefa no painel geral{plano.okrVinculadoId ? ', vinculada ao OKR do plano' : ''}.
+                    Esta acao sera criada tambem como tarefa no painel geral{plano.okrVinculadoId ? ', vinculada ao KR do plano' : ''}.
                   </p>
                   <div className="flex items-center gap-2 justify-end">
                     <Button
@@ -506,11 +509,13 @@ export default function PlanosAcaoPage() {
     if (!clienteAtivo || !formTitulo.trim()) return
     setSaving(true)
     try {
+      // formOkrId format: "okrId|krId" or "none"
+      const [selectedOkrId, selectedKrId] = formOkrId && formOkrId !== 'none' ? formOkrId.split('|') : [undefined, undefined]
       await createPlanoAcao({
         empresaId: clienteAtivo.id,
         titulo: formTitulo.trim(),
         descricao: formDescricao.trim() || undefined,
-        okrId: formOkrId || undefined,
+        okrId: selectedOkrId,
       })
       setDialogOpen(false)
       await loadData()
@@ -645,17 +650,21 @@ export default function PlanosAcaoPage() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label className="text-sm">Vincular a OKR (opcional)</Label>
+              <Label className="text-sm">Vincular a Key Result (opcional)</Label>
               <Select value={formOkrId} onValueChange={setFormOkrId}>
-                <SelectTrigger><SelectValue placeholder="Nenhum OKR vinculado" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Nenhum KR vinculado" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Nenhum</SelectItem>
-                  {okrs.map((o: { id: string; objetivo: string }) => (
-                    <SelectItem key={o.id} value={o.id}>{o.objetivo}</SelectItem>
-                  ))}
+                  {okrs.flatMap((o: { id: string; objetivo: string; KeyResult?: Array<{ id: string; descricao: string }> }) =>
+                    (o.KeyResult ?? []).map((kr) => (
+                      <SelectItem key={kr.id} value={`${o.id}|${kr.id}`}>
+                        [{o.objetivo.slice(0, 25)}] {kr.descricao.slice(0, 45)}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
-              <p className="text-[10px] text-muted-foreground">As acoes deste plano serao vinculadas ao OKR selecionado como tarefas.</p>
+              <p className="text-[10px] text-muted-foreground">As acoes deste plano serao vinculadas ao KR selecionado como tarefas no painel geral.</p>
             </div>
           </div>
           <DialogFooter>
