@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import { ChevronDown, ChevronUp, Check, Pencil, Plus, Loader2, CheckCircle } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ChevronDown, ChevronUp, Check, Pencil, Plus, Loader2, CheckCircle, ListTodo } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { createTarefa, getCurrentUserId } from '@/lib/api/data-service'
+import { createTarefa, getCurrentUserId, getTarefasByEmpresa } from '@/lib/api/data-service'
 
 export type OKRStatus = 'Rascunho' | 'Ativo' | 'Concluido' | 'Cancelado'
 
@@ -240,9 +240,34 @@ function KRRow({
   )
 }
 
+interface TarefaVinculada {
+  id: string
+  titulo: string
+  status: string
+  prioridade: string
+  responsavel?: { nome: string } | null
+  prazo?: string
+}
+
 export function OKRCard({ okr, empresaId, onUpdateKRValor }: OKRCardProps) {
   const [expanded, setExpanded] = useState(false)
   const overall = calcOverallProgress(okr)
+  const [tarefasVinculadas, setTarefasVinculadas] = useState<TarefaVinculada[]>([])
+
+  // Load tarefas linked to this OKR
+  useEffect(() => {
+    if (!expanded || !empresaId) return
+    async function loadTarefas() {
+      try {
+        const data = await getTarefasByEmpresa(empresaId)
+        if (data) {
+          const linked = (data as TarefaVinculada[]).filter((t: { okrId?: string }) => t.okrId === okr.id)
+          setTarefasVinculadas(linked)
+        }
+      } catch { /* ignore */ }
+    }
+    loadTarefas()
+  }, [expanded, empresaId, okr.id])
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden transition-shadow hover:shadow-md">
@@ -303,7 +328,7 @@ export function OKRCard({ okr, empresaId, onUpdateKRValor }: OKRCardProps) {
         </div>
       </button>
 
-      {/* Expanded KRs */}
+      {/* Expanded KRs + Tarefas */}
       {expanded && (
         <div className="px-5 pb-5 flex flex-col gap-2 border-t border-border pt-4">
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
@@ -318,6 +343,54 @@ export function OKRCard({ okr, empresaId, onUpdateKRValor }: OKRCardProps) {
               onUpdate={(val) => onUpdateKRValor(okr.id, kr.id, val)}
             />
           ))}
+
+          {/* Tarefas vinculadas a este OKR */}
+          {tarefasVinculadas.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-border">
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <ListTodo size={12} />
+                Tarefas Vinculadas ({tarefasVinculadas.length})
+              </h4>
+              <div className="flex flex-col gap-1.5">
+                {tarefasVinculadas.map((t) => {
+                  const statusColors: Record<string, string> = {
+                    BACKLOG: 'bg-secondary text-muted-foreground',
+                    A_FAZER: 'bg-blue-500/15 text-blue-500',
+                    EM_PROGRESSO: 'bg-yellow-500/15 text-yellow-600',
+                    REVISAO: 'bg-purple-500/15 text-purple-500',
+                    CONCLUIDA: 'bg-green-500/15 text-green-500',
+                    CANCELADA: 'bg-red-500/15 text-red-500',
+                  }
+                  const statusLabels: Record<string, string> = {
+                    BACKLOG: 'Backlog', A_FAZER: 'A Fazer', EM_PROGRESSO: 'Em Progresso',
+                    REVISAO: 'Revisao', CONCLUIDA: 'Concluida', CANCELADA: 'Cancelada',
+                  }
+                  return (
+                    <div key={t.id} className="flex items-center justify-between gap-2 rounded-md border border-border bg-background px-3 py-2">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {t.status === 'CONCLUIDA' ? (
+                          <CheckCircle size={14} className="text-green-500 shrink-0" />
+                        ) : (
+                          <div className="w-3.5 h-3.5 rounded-full border-2 border-muted-foreground/30 shrink-0" />
+                        )}
+                        <span className={`text-sm truncate ${t.status === 'CONCLUIDA' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                          {t.titulo}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {t.responsavel?.nome && (
+                          <span className="text-[10px] text-muted-foreground">{t.responsavel.nome.split(' ')[0]}</span>
+                        )}
+                        <Badge className={`text-[9px] h-4 px-1.5 border-0 ${statusColors[t.status] ?? statusColors.BACKLOG}`}>
+                          {statusLabels[t.status] ?? t.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
