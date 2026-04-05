@@ -186,6 +186,16 @@ export default function TarefasPage() {
     }
   }
 
+  async function handleDeleteTarefa(tarefaId: string) {
+    try {
+      await deleteTarefa(tarefaId)
+      setSelectedTarefa(null)
+      await loadTarefas()
+    } catch (err) {
+      console.error("Erro ao excluir tarefa:", err)
+    }
+  }
+
   async function handleCreateTarefa(
     data: Omit<
       Tarefa,
@@ -516,6 +526,7 @@ export default function TarefasPage() {
         open={selectedTarefa !== null}
         onClose={() => setSelectedTarefa(null)}
         onUpdate={handleUpdateTarefa}
+        onDelete={handleDeleteTarefa}
         usuarios={usuarios}
       />
 

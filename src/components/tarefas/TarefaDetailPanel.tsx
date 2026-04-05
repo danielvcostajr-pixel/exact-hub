@@ -51,6 +51,7 @@ interface TarefaDetailPanelProps {
   open: boolean
   onClose: () => void
   onUpdate?: (tarefa: Tarefa) => void
+  onDelete?: (tarefaId: string) => void
   usuarios?: Usuario[]
 }
 
@@ -70,6 +71,7 @@ export default function TarefaDetailPanel({
   open,
   onClose,
   onUpdate,
+  onDelete,
   usuarios = [],
 }: TarefaDetailPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>("detalhes")
@@ -78,6 +80,7 @@ export default function TarefaDetailPanel({
   const [newComment, setNewComment] = useState("")
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [isEditingDesc, setIsEditingDesc] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   // Sync local state with prop
   const current = editedTarefa && editedTarefa.id === tarefa?.id ? editedTarefa : tarefa
@@ -177,14 +180,51 @@ export default function TarefaDetailPanel({
                 </SheetTitle>
               )}
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="h-7 w-7 p-0 shrink-0"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-1 shrink-0">
+              {onDelete && (
+                confirmDelete ? (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        onDelete(current.id)
+                        setConfirmDelete(false)
+                      }}
+                      className="h-7 text-xs px-2"
+                    >
+                      Confirmar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setConfirmDelete(false)}
+                      className="h-7 text-xs px-2"
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setConfirmDelete(true)}
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500"
+                    title="Excluir tarefa"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="h-7 w-7 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
           {/* Status + Priority badges */}
