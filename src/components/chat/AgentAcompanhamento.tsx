@@ -34,9 +34,18 @@ interface TarefaExtraida {
   responsavelId: string | null
   prazo: string | null
   prioridade: 'BAIXA' | 'MEDIA' | 'ALTA' | 'URGENTE'
+  categoria: string
   aprovada: boolean
   criada: boolean
   editando: boolean
+}
+
+interface AtaReuniao {
+  resumo: string
+  pauta: string[]
+  decisoes: string[]
+  tarefas: TarefaExtraida[]
+  proximosPassos: string[]
 }
 
 interface UsuarioOption {
@@ -48,10 +57,9 @@ interface ChatMessage {
   id: string
   role: 'user' | 'agent'
   content: string
-  type: 'text' | 'file' | 'tarefas' | 'status'
+  type: 'text' | 'file' | 'ata' | 'status'
   fileName?: string
-  tarefas?: TarefaExtraida[]
-  resumo?: string
+  ata?: AtaReuniao
 }
 
 interface AgentAcompanhamentoProps {
@@ -173,7 +181,7 @@ export function AgentAcompanhamento({ empresaId, empresaNome, onBack }: AgentAco
 
       const result = await res.json()
       const tarefas: TarefaExtraida[] = (result.tarefas || []).map(
-        (t: { titulo: string; descricao: string; responsavel: string | null; prazo: string | null; prioridade: string }, i: number) => ({
+        (t: { titulo: string; descricao: string; responsavel: string | null; prazo: string | null; prioridade: string; categoria?: string }, i: number) => ({
           id: `tarefa-${Date.now()}-${i}`,
           titulo: t.titulo,
           descricao: t.descricao || '',
@@ -181,11 +189,20 @@ export function AgentAcompanhamento({ empresaId, empresaNome, onBack }: AgentAco
           responsavelId: null,
           prazo: t.prazo,
           prioridade: (['BAIXA', 'MEDIA', 'ALTA', 'URGENTE'].includes(t.prioridade) ? t.prioridade : 'MEDIA') as TarefaExtraida['prioridade'],
+          categoria: t.categoria || 'Geral',
           aprovada: false,
           criada: false,
           editando: false,
         })
       )
+
+      const ata: AtaReuniao = {
+        resumo: result.resumo || 'Analise concluida.',
+        pauta: result.pauta || [],
+        decisoes: result.decisoes || [],
+        tarefas,
+        proximosPassos: result.proximosPassos || [],
+      }
 
       // Remove processing message, add result
       setMessages((prev) => {
@@ -195,10 +212,9 @@ export function AgentAcompanhamento({ empresaId, empresaNome, onBack }: AgentAco
           {
             id: genId(),
             role: 'agent' as const,
-            content: result.resumo || 'Analise concluida.',
-            type: 'tarefas' as const,
-            resumo: result.resumo,
-            tarefas,
+            content: ata.resumo,
+            type: 'ata' as const,
+            ata,
           },
         ]
       })
@@ -244,10 +260,10 @@ export function AgentAcompanhamento({ empresaId, empresaNome, onBack }: AgentAco
   function updateTarefa(msgId: string, tarefaId: string, updates: Partial<TarefaExtraida>) {
     setMessages((prev) =>
       prev.map((m) => {
-        if (m.id !== msgId || !m.tarefas) return m
+        if (m.id !== msgId || !m.ata) return m
         return {
           ...m,
-          tarefas: m.tarefas.map((t) => (t.id === tarefaId ? { ...t, ...updates } : t)),
+          ata: { ...m.ata, tarefas: m.ata.tarefas.map((t) => (t.id === tarefaId ? { ...t, ...updates } : t)) },
         }
       })
     )
@@ -256,8 +272,8 @@ export function AgentAcompanhamento({ empresaId, empresaNome, onBack }: AgentAco
   function removeTarefa(msgId: string, tarefaId: string) {
     setMessages((prev) =>
       prev.map((m) => {
-        if (m.id !== msgId || !m.tarefas) return m
-        return { ...m, tarefas: m.tarefas.filter((t) => t.id !== tarefaId) }
+        if (m.id !== msgId || !m.ata) return m
+        return { ...m, ata: { ...m.ata, tarefas: m.ata.tarefas.filter((t) => t.id !== tarefaId) } }
       })
     )
   }
@@ -287,8 +303,8 @@ export function AgentAcompanhamento({ empresaId, empresaNome, onBack }: AgentAco
 
   async function handleAprovarTodas(msgId: string) {
     const msg = messages.find((m) => m.id === msgId)
-    if (!msg?.tarefas) return
-    const pendentes = msg.tarefas.filter((t) => !t.criada)
+    if (!msg?.ata?.tarefas) return
+    const pendentes = msg.ata.tarefas.filter((t) => !t.criada)
     for (const tarefa of pendentes) {
       await handleAprovarTarefa(msgId, tarefa)
     }
@@ -351,46 +367,116 @@ export function AgentAcompanhamento({ empresaId, empresaNome, onBack }: AgentAco
                 </div>
               )}
 
-              {msg.role === 'agent' && msg.type === 'tarefas' && msg.tarefas && (
+              {msg.role === 'agent' && msg.type === 'ata' && msg.ata && (
                 <div className="flex gap-2.5">
                   <div className="size-7 rounded-full bg-primary/15 flex items-center justify-center shrink-0 mt-0.5">
                     <Bot className="size-4 text-primary" />
                   </div>
                   <div className="flex-1 space-y-3 min-w-0">
-                    {/* Summary */}
+                    {/* Resumo */}
                     <div className="bg-card border border-border rounded-xl px-4 py-3">
-                      <p className="text-sm text-foreground whitespace-pre-wrap">{msg.resumo}</p>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {msg.tarefas.length} tarefa(s) identificada(s). Revise e aprove abaixo.
-                      </p>
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Resumo da Reuniao</h4>
+                      <p className="text-sm text-foreground whitespace-pre-wrap">{msg.ata.resumo}</p>
                     </div>
 
-                    {/* Task cards */}
-                    {msg.tarefas.map((tarefa) => (
-                      <TarefaCard
-                        key={tarefa.id}
-                        tarefa={tarefa}
-                        usuarios={usuarios}
-                        msgId={msg.id}
-                        onUpdate={updateTarefa}
-                        onRemove={removeTarefa}
-                        onAprovar={handleAprovarTarefa}
-                      />
-                    ))}
+                    {/* Pauta */}
+                    {msg.ata.pauta.length > 0 && (
+                      <div className="bg-card border border-border rounded-xl px-4 py-3">
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Pauta Discutida</h4>
+                        <ul className="space-y-1">
+                          {msg.ata.pauta.map((item, i) => (
+                            <li key={i} className="text-sm text-foreground flex gap-2">
+                              <span className="text-muted-foreground shrink-0">•</span>
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Decisoes */}
+                    {msg.ata.decisoes.length > 0 && (
+                      <div className="bg-card border border-border rounded-xl px-4 py-3">
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Decisoes Tomadas</h4>
+                        <ul className="space-y-1">
+                          {msg.ata.decisoes.map((d, i) => (
+                            <li key={i} className="text-sm text-foreground flex gap-2">
+                              <CheckCircle className="size-3.5 text-green-500 shrink-0 mt-0.5" />
+                              {d}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Tarefas por categoria */}
+                    {msg.ata.tarefas.length > 0 && (
+                      <div className="bg-card border border-border rounded-xl px-4 py-3">
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+                          Atividades Identificadas ({msg.ata.tarefas.length})
+                        </h4>
+                        <p className="text-[11px] text-muted-foreground mb-3">
+                          Revise, edite e aprove as tarefas antes de criar na plataforma.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Group tasks by category */}
+                    {(() => {
+                      const categories = new Map<string, TarefaExtraida[]>()
+                      for (const t of msg.ata.tarefas) {
+                        const cat = t.categoria || 'Geral'
+                        if (!categories.has(cat)) categories.set(cat, [])
+                        categories.get(cat)!.push(t)
+                      }
+                      return Array.from(categories.entries()).map(([cat, tarefas]) => (
+                        <div key={cat} className="space-y-2">
+                          {categories.size > 1 && (
+                            <h5 className="text-xs font-semibold text-primary uppercase tracking-wide px-1">{cat}</h5>
+                          )}
+                          {tarefas.map((tarefa) => (
+                            <TarefaCard
+                              key={tarefa.id}
+                              tarefa={tarefa}
+                              usuarios={usuarios}
+                              msgId={msg.id}
+                              onUpdate={updateTarefa}
+                              onRemove={removeTarefa}
+                              onAprovar={handleAprovarTarefa}
+                            />
+                          ))}
+                        </div>
+                      ))
+                    })()}
+
+                    {/* Proximos passos */}
+                    {msg.ata.proximosPassos.length > 0 && (
+                      <div className="bg-card border border-border rounded-xl px-4 py-3">
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Proximos Passos</h4>
+                        <ul className="space-y-1">
+                          {msg.ata.proximosPassos.map((p, i) => (
+                            <li key={i} className="text-sm text-foreground flex gap-2">
+                              <span className="text-primary shrink-0">→</span>
+                              {p}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
                     {/* Approve all button */}
-                    {msg.tarefas.some((t) => !t.criada) && (
+                    {msg.ata.tarefas.some((t) => !t.criada) && (
                       <Button
                         onClick={() => handleAprovarTodas(msg.id)}
                         className="w-full bg-green-600 hover:bg-green-700 text-white"
                         size="sm"
                       >
                         <CheckCircle className="size-4 mr-2" />
-                        Aprovar Todas ({msg.tarefas.filter((t) => !t.criada).length} pendentes)
+                        Aprovar Todas ({msg.ata.tarefas.filter((t) => !t.criada).length} pendentes)
                       </Button>
                     )}
 
-                    {msg.tarefas.length > 0 && msg.tarefas.every((t) => t.criada) && (
+                    {msg.ata.tarefas.length > 0 && msg.ata.tarefas.every((t) => t.criada) && (
                       <div className="flex items-center gap-2 px-4 py-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl text-sm text-green-700 dark:text-green-400">
                         <CheckCircle className="size-4" />
                         Todas as tarefas foram criadas com sucesso!
