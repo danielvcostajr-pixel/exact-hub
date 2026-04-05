@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
 
 export const maxDuration = 60 // seconds
 export const dynamic = 'force-dynamic'
@@ -136,37 +135,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(fallbackParse(transcricao))
     }
 
-    // OpenAI GPT-5.4 Nano (rapido e barato)
-    const openai = new OpenAI({ apiKey })
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-5.4-nano',
-      temperature: 0.3,
-      max_completion_tokens: 8192,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        {
-          role: 'user',
-          content: `Data de hoje: ${hoje} (${diaSemana})\n\nAnalise a seguinte transcricao de reuniao, gere a ata completa e extraia todas as tarefas e atividades:\n\n${transcricao}`,
-        },
-      ],
+    // OpenAI GPT-5.4 Nano via native fetch (avoids SDK "t.trim" crash)
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-5.4-nano',
+        temperature: 0.3,
+        max_completion_tokens: 8192,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          {
+            role: 'user',
+            content: `Data de hoje: ${hoje} (${diaSemana})\n\nAnalise a seguinte transcricao de reuniao, gere a ata completa e extraia todas as tarefas e atividades:\n\n${transcricao}`,
+          },
+        ],
+      }),
     })
 
-    // Extract text from response — handle both string and array content formats
-    const rawContent = completion.choices[0]?.message?.content
-    let responseText: string
-    if (typeof rawContent === 'string') {
-      responseText = rawContent.trim()
-    } else if (Array.isArray(rawContent)) {
-      responseText = rawContent
-        .filter((part: unknown) => typeof part === 'object' && part !== null && 'type' in part && (part as { type: string }).type === 'text')
-        .map((part: unknown) => (part as { text: string }).text)
-        .join('\n')
-        .trim()
-    } else {
-      responseText = String(rawContent || '').trim()
+    if (!res.ok) {
+      const errBody = await res.text()
+      console.error('OpenAI API error:', res.status, errBody)
+      return NextResponse.json(
+        { error: `Erro na API OpenAI: ${res.status}` },
+        { status: 502 },
+      )
     }
+
+    const data = await res.json()
+    const responseText = data.choices[0]?.message?.content || ''
 
     if (!responseText) {
       return NextResponse.json({ error: 'Resposta vazia do modelo' }, { status: 500 })
