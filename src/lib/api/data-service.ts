@@ -585,3 +585,96 @@ export async function saveSimulador(params: {
     return data
   }
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ADMIN Functions
+// ══════════════════════════════════════════════════════════════════════════════
+
+export async function getAllUsuarios() {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('Usuario').select('*, empresa:Empresa!empresaId(id, razaoSocial, nomeFantasia)')
+    .order('nome')
+  if (error) throw error
+  return data
+}
+
+export async function createUsuario(params: {
+  email: string; nome: string; papel: string; empresaId?: string
+}) {
+  const supabase = createClient()
+  // Create auth user first
+  const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
+    email: params.email,
+    password: 'ExactHub2026!',
+    email_confirm: true,
+  })
+  if (authErr) {
+    // Fallback: try to just insert in Usuario table (auth user might already exist)
+    const { data, error } = await supabase.from('Usuario').insert({
+      email: params.email, nome: params.nome,
+      papel: params.papel, empresaId: params.empresaId ?? null, ativo: true,
+    }).select().single()
+    if (error) throw error
+    return data
+  }
+  // Insert in Usuario table with auth user id
+  const { data, error } = await supabase.from('Usuario').insert({
+    id: authData.user.id, email: params.email, nome: params.nome,
+    papel: params.papel, empresaId: params.empresaId ?? null, ativo: true,
+  }).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function updateUsuario(usuarioId: string, updates: Record<string, unknown>) {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('Usuario').update({ ...updates }).eq('id', usuarioId).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function toggleUsuarioAtivo(usuarioId: string) {
+  const supabase = createClient()
+  const { data: user } = await supabase.from('Usuario').select('ativo').eq('id', usuarioId).single()
+  if (!user) throw new Error('Usuario nao encontrado')
+  const { data, error } = await supabase
+    .from('Usuario').update({ ativo: !user.ativo }).eq('id', usuarioId).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function getAllEmpresasAdmin() {
+  const supabase = createClient()
+  const { data, error } = await supabase.from('Empresa').select('*').order('razaoSocial')
+  if (error) throw error
+  return data
+}
+
+export async function updateEmpresa(empresaId: string, updates: Record<string, unknown>) {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('Empresa').update({ ...updates }).eq('id', empresaId).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function getSystemStats() {
+  const supabase = createClient()
+  const [usuarios, empresas] = await Promise.all([
+    supabase.from('Usuario').select('id, papel, ativo'),
+    supabase.from('Empresa').select('id, ativa'),
+  ])
+  const users = usuarios.data ?? []
+  const emps = empresas.data ?? []
+  return {
+    totalUsuarios: users.length,
+    usuariosAtivos: users.filter(u => u.ativo).length,
+    consultores: users.filter(u => u.papel === 'CONSULTOR').length,
+    clientes: users.filter(u => u.papel === 'CLIENTE').length,
+    admins: users.filter(u => u.papel === 'ADMIN').length,
+    totalEmpresas: emps.length,
+    empresasAtivas: emps.filter(e => e.ativa).length,
+  }
+}

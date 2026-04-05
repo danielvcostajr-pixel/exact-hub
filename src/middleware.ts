@@ -25,7 +25,6 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh session — must call getUser() (not getSession()) for security
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -44,11 +43,39 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Authenticated user on login page or root → send to consultor dashboard
+  // Authenticated user on login page or root → redirect by role
   if (user && (pathname === '/login' || pathname === '/')) {
+    // Fetch user profile to determine role
+    const { data: profile } = await supabase
+      .from('Usuario')
+      .select('papel')
+      .eq('id', user.id)
+      .maybeSingle()
+
     const url = request.nextUrl.clone()
-    url.pathname = '/consultor'
+    if (profile?.papel === 'ADMIN') {
+      url.pathname = '/admin'
+    } else if (profile?.papel === 'CLIENTE') {
+      url.pathname = '/cliente'
+    } else {
+      url.pathname = '/consultor'
+    }
     return NextResponse.redirect(url)
+  }
+
+  // Protect admin routes — only ADMIN can access /admin/*
+  if (user && pathname.startsWith('/admin')) {
+    const { data: profile } = await supabase
+      .from('Usuario')
+      .select('papel')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (profile?.papel !== 'ADMIN') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/consultor'
+      return NextResponse.redirect(url)
+    }
   }
 
   return supabaseResponse
