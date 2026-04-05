@@ -8,10 +8,12 @@ import {
   ArrowUp,
   ArrowDown,
   ChevronRight,
+  Trash2,
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
 import {
   Tarefa,
   StatusTarefa,
@@ -24,6 +26,8 @@ import { cn } from "@/lib/utils"
 interface TarefaListViewProps {
   tarefas: Tarefa[]
   onSelectTarefa: (tarefa: Tarefa) => void
+  onUpdateStatus?: (tarefaId: string, status: StatusTarefa) => void
+  onDeleteTarefas?: (ids: string[]) => void
   selectedTarefaId?: string
 }
 
@@ -46,6 +50,15 @@ const STATUS_ORDER: Record<StatusTarefa, number> = {
   CANCELADA: 5,
 }
 
+const STATUS_OPTIONS: { value: StatusTarefa; label: string }[] = [
+  { value: "BACKLOG", label: "Backlog" },
+  { value: "A_FAZER", label: "A Fazer" },
+  { value: "EM_PROGRESSO", label: "Em Progresso" },
+  { value: "REVISAO", label: "Revisao" },
+  { value: "CONCLUIDA", label: "Concluida" },
+  { value: "CANCELADA", label: "Cancelada" },
+]
+
 function getInitials(name: string) {
   return name
     .split(" ")
@@ -58,11 +71,14 @@ function getInitials(name: string) {
 export default function TarefaListView({
   tarefas,
   onSelectTarefa,
+  onUpdateStatus,
+  onDeleteTarefas,
   selectedTarefaId,
 }: TarefaListViewProps) {
   const [sortField, setSortField] = useState<SortField>("prioridade")
   const [sortDir, setSortDir] = useState<SortDir>("asc")
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   function handleSort(field: SortField) {
     if (sortField === field) {
@@ -80,11 +96,20 @@ export default function TarefaListView({
       else next.add(id)
       return next
     })
+    setConfirmDelete(false)
   }
 
   function toggleAll() {
     if (selected.size === tarefas.length) setSelected(new Set())
     else setSelected(new Set(tarefas.map((t) => t.id)))
+    setConfirmDelete(false)
+  }
+
+  function handleDeleteSelected() {
+    if (!onDeleteTarefas || selected.size === 0) return
+    onDeleteTarefas(Array.from(selected))
+    setSelected(new Set())
+    setConfirmDelete(false)
   }
 
   const sorted = [...tarefas].sort((a, b) => {
@@ -107,6 +132,57 @@ export default function TarefaListView({
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
+      {/* Barra de acoes quando ha selecao */}
+      {selected.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-primary/5 border-b border-border">
+          <span className="text-sm font-medium text-foreground">
+            {selected.size} selecionada{selected.size !== 1 ? "s" : ""}
+          </span>
+          <div className="flex-1" />
+          {onDeleteTarefas && (
+            confirmDelete ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-red-600">Excluir {selected.size} tarefa{selected.size !== 1 ? "s" : ""}?</span>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDeleteSelected}
+                  className="h-7 text-xs"
+                >
+                  Confirmar
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmDelete(false)}
+                  className="h-7 text-xs"
+                >
+                  Cancelar
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setConfirmDelete(true)}
+                className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1" />
+                Excluir
+              </Button>
+            )
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => { setSelected(new Set()); setConfirmDelete(false) }}
+            className="h-7 text-xs"
+          >
+            Limpar selecao
+          </Button>
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -207,16 +283,34 @@ export default function TarefaListView({
                       {tarefa.descricao}
                     </div>
                   </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={cn(
-                        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
-                        statusCfg.bg,
-                        statusCfg.color
-                      )}
-                    >
-                      {statusCfg.label}
-                    </span>
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    {onUpdateStatus ? (
+                      <select
+                        value={tarefa.status}
+                        onChange={(e) => onUpdateStatus(tarefa.id, e.target.value as StatusTarefa)}
+                        className={cn(
+                          "appearance-none cursor-pointer rounded-full px-2.5 py-0.5 text-xs font-medium border-0 outline-none",
+                          statusCfg.bg,
+                          statusCfg.color,
+                        )}
+                      >
+                        {STATUS_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span
+                        className={cn(
+                          "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                          statusCfg.bg,
+                          statusCfg.color
+                        )}
+                      >
+                        {statusCfg.label}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span
@@ -281,9 +375,6 @@ export default function TarefaListView({
       </div>
       <div className="px-4 py-3 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
         <span>{sorted.length} tarefa{sorted.length !== 1 ? "s" : ""} exibida{sorted.length !== 1 ? "s" : ""}</span>
-        {selected.size > 0 && (
-          <span>{selected.size} selecionada{selected.size !== 1 ? "s" : ""}</span>
-        )}
       </div>
     </div>
   )

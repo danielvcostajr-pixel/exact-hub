@@ -196,6 +196,18 @@ export default function TarefasPage() {
     }
   }
 
+  async function handleDeleteTarefas(ids: string[]) {
+    try {
+      for (const id of ids) {
+        await deleteTarefa(id)
+      }
+      setSelectedTarefa(null)
+      await loadTarefas()
+    } catch (err) {
+      console.error("Erro ao excluir tarefas:", err)
+    }
+  }
+
   async function handleCreateTarefa(
     data: Omit<
       Tarefa,
@@ -493,6 +505,8 @@ export default function TarefasPage() {
           <TarefaListView
             tarefas={tarefasFiltradas}
             onSelectTarefa={handleSelectTarefa}
+            onUpdateStatus={handleUpdateStatus}
+            onDeleteTarefas={handleDeleteTarefas}
             selectedTarefaId={selectedTarefa?.id}
           />
         )}
