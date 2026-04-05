@@ -107,60 +107,33 @@ export function AgentAcompanhamento({ empresaId, empresaNome, onBack }: AgentAco
     }, 100)
   }
 
-  // ── File reading ─────────────────────────────────────────────────────────
+  // ── Convert file to base64 ───────────────────────────────────────────────
 
-  async function readFileAsText(file: File): Promise<string> {
-    const ext = file.name.split('.').pop()?.toLowerCase()
-
-    if (ext === 'txt' || ext === 'csv' || ext === 'md') {
-      return file.text()
+  async function fileToBase64(file: File): Promise<string> {
+    const buffer = await file.arrayBuffer()
+    const bytes = new Uint8Array(buffer)
+    let binary = ''
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i])
     }
-
-    if (ext === 'pdf') {
-      // Read PDF as text (basic extraction using array buffer)
-      const buffer = await file.arrayBuffer()
-      const bytes = new Uint8Array(buffer)
-      let text = ''
-      // Simple PDF text extraction - look for text between BT and ET markers
-      const str = new TextDecoder('latin1').decode(bytes)
-      const matches = str.match(/\(([^)]+)\)/g)
-      if (matches) {
-        text = matches.map((m) => m.slice(1, -1)).join(' ')
-      }
-      if (text.trim().length < 20) {
-        return `[Conteudo do arquivo PDF: ${file.name}]\n\nNao foi possivel extrair o texto automaticamente. Por favor, copie e cole o conteudo da transcricao diretamente no chat.`
-      }
-      return text
-    }
-
-    if (ext === 'docx') {
-      // Basic DOCX extraction - read XML content
-      try {
-        const buffer = await file.arrayBuffer()
-        const str = new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(buffer))
-        // Extract text between XML tags
-        const textContent = str.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-        if (textContent.length > 50) return textContent
-      } catch { /* fallback */ }
-      return `[Conteudo do arquivo DOCX: ${file.name}]\n\nPara melhor resultado, copie e cole o texto da transcricao diretamente.`
-    }
-
-    // Fallback: try to read as text
-    return file.text()
+    return btoa(binary)
   }
 
-  // ── Process transcription ────────────────────────────────────────────────
+  // ── Process transcription (text or file) ────────────────────────────────
 
-  async function processTranscricao(text: string, fileName?: string) {
+  async function processTranscricao(input: { text: string } | { file: File }) {
     setProcessing(true)
     await loadUsuarios()
+
+    const isFile = 'file' in input
+    const fileName = isFile ? input.file.name : undefined
 
     // Add user message
     const userMsg: ChatMessage = {
       id: genId(),
       role: 'user',
-      content: fileName ? `Arquivo enviado: ${fileName}` : text.slice(0, 200) + (text.length > 200 ? '...' : ''),
-      type: fileName ? 'file' : 'text',
+      content: isFile ? `Arquivo enviado: ${input.file.name}` : input.text.slice(0, 200) + (input.text.length > 200 ? '...' : ''),
+      type: isFile ? 'file' : 'text',
       fileName,
     }
     setMessages((prev) => [...prev, userMsg])
@@ -170,17 +143,27 @@ export function AgentAcompanhamento({ empresaId, empresaNome, onBack }: AgentAco
     const processingMsg: ChatMessage = {
       id: genId(),
       role: 'agent',
-      content: 'Analisando a transcricao e identificando tarefas...',
+      content: isFile
+        ? 'Extraindo texto do arquivo e identificando tarefas...'
+        : 'Analisando a transcricao e identificando tarefas...',
       type: 'status',
     }
     setMessages((prev) => [...prev, processingMsg])
     scrollToBottom()
 
     try {
+      let body: Record<string, string>
+      if (isFile) {
+        const base64 = await fileToBase64(input.file)
+        body = { fileBase64: base64, fileName: input.file.name }
+      } else {
+        body = { transcricao: input.text }
+      }
+
       const res = await fetch('/api/agent/analise-reuniao', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcricao: text }),
+        body: JSON.stringify(body),
       })
 
       if (!res.ok) {
@@ -244,9 +227,7 @@ export function AgentAcompanhamento({ empresaId, empresaNome, onBack }: AgentAco
     const file = e.target.files?.[0]
     if (!file) return
     e.target.value = ''
-
-    const text = await readFileAsText(file)
-    await processTranscricao(text, file.name)
+    await processTranscricao({ file })
   }
 
   // ── Text send ────────────────────────────────────────────────────────────
@@ -255,7 +236,7 @@ export function AgentAcompanhamento({ empresaId, empresaNome, onBack }: AgentAco
     if (!textInput.trim() || processing) return
     const text = textInput.trim()
     setTextInput('')
-    await processTranscricao(text)
+    await processTranscricao({ text })
   }
 
   // ── Task editing helpers ─────────────────────────────────────────────────
