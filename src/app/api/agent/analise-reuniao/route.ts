@@ -114,19 +114,16 @@ export async function POST(request: NextRequest) {
     const hoje = new Date().toISOString().split('T')[0]
     const diaSemana = new Date().toLocaleDateString('pt-BR', { weekday: 'long' })
 
-    const apiKey = process.env.OPENROUTER_API_KEY
+    const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey || apiKey === 'placeholder') {
       return NextResponse.json(fallbackParse(transcricao))
     }
 
-    // Qwen 3.6 Plus Free via OpenRouter (custo $0, rapido, suporta JSON)
-    const openrouter = new OpenAI({
-      apiKey,
-      baseURL: 'https://openrouter.ai/api/v1',
-    })
+    // OpenAI GPT-5.4 Nano (rapido e barato)
+    const openai = new OpenAI({ apiKey })
 
-    const completion = await openrouter.chat.completions.create({
-      model: 'qwen/qwen3.6-plus:free',
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-5.4-nano',
       temperature: 0.3,
       max_tokens: 8192,
       response_format: { type: 'json_object' },
