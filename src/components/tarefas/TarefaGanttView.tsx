@@ -39,8 +39,15 @@ export default function TarefaGanttView({
 }: TarefaGanttViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  // Filter out tasks without valid dates for Gantt rendering
+  const tarefasComDatas = useMemo(
+    () => tarefas.filter((t) => t.dataInicio && t.prazo && t.dataInicio.length >= 10 && t.prazo.length >= 10),
+    [tarefas]
+  )
+  const tarefasSemDatas = tarefas.length - tarefasComDatas.length
+
   const { timelineStart, totalDays, weeks } = useMemo(() => {
-    if (tarefas.length === 0) {
+    if (tarefasComDatas.length === 0) {
       const start = startOfWeek(new Date(), { weekStartsOn: 1 })
       return {
         timelineStart: start,
@@ -49,9 +56,9 @@ export default function TarefaGanttView({
       }
     }
 
-    const allDates = tarefas.flatMap((t) => [
-      t.dataInicio ? parseISO(t.dataInicio) : new Date(),
-      t.prazo ? parseISO(t.prazo) : new Date(),
+    const allDates = tarefasComDatas.flatMap((t) => [
+      parseISO(t.dataInicio),
+      parseISO(t.prazo),
     ]).filter((d) => !isNaN(d.getTime()))
     if (allDates.length === 0) allDates.push(new Date())
     const minDate = new Date(Math.min(...allDates.map((d) => d.getTime())))
@@ -69,7 +76,7 @@ export default function TarefaGanttView({
     }
 
     return { timelineStart: start, totalDays: total, weeks: weeksArr }
-  }, [tarefas])
+  }, [tarefasComDatas])
 
   function dayOffset(dateStr: string) {
     return differenceInDays(parseISO(dateStr), timelineStart)
@@ -94,7 +101,7 @@ export default function TarefaGanttView({
             Tarefa
           </div>
           {/* Task rows */}
-          {tarefas.map((tarefa) => {
+          {tarefasComDatas.map((tarefa) => {
             const prioridadeCfg = PRIORIDADE_CONFIG[tarefa.prioridade]
             return (
               <div
@@ -178,7 +185,7 @@ export default function TarefaGanttView({
               )}
 
               {/* Task rows */}
-              {tarefas.map((tarefa) => {
+              {tarefasComDatas.map((tarefa) => {
                 const startOffset = dayOffset(tarefa.dataInicio)
                 const endOffset = dayOffset(tarefa.prazo)
                 const duration = Math.max(endOffset - startOffset + 1, 1)
@@ -273,6 +280,11 @@ export default function TarefaGanttView({
           Hoje
         </span>
       </div>
+      {tarefasSemDatas > 0 && (
+        <div className="px-4 py-2 border-t border-border text-xs text-amber-500">
+          {tarefasSemDatas} tarefa{tarefasSemDatas !== 1 ? 's' : ''} sem data de inicio ou prazo definido — nao exibida{tarefasSemDatas !== 1 ? 's' : ''} no Gantt.
+        </div>
+      )}
     </div>
   )
 }
