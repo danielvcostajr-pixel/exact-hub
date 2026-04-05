@@ -58,6 +58,17 @@ function FixoRow({ item, onUpdate, onDelete }: FixoRowProps) {
   const [valor, setValor] = useState(String(item.valor || ''))
   const [showReajustes, setShowReajustes] = useState(false)
 
+  // Auto-propagate changes to parent on every keystroke
+  function handleNomeChange(v: string) {
+    setNome(v)
+    onUpdate({ ...item, nome: v, valor: parseFloat(valor) || 0 })
+  }
+
+  function handleValorChange(v: string) {
+    setValor(v)
+    onUpdate({ ...item, nome, valor: parseFloat(v) || 0 })
+  }
+
   function salvar() {
     onUpdate({ ...item, nome, valor: parseFloat(valor) || 0 })
     setEditing(false)
@@ -100,7 +111,7 @@ function FixoRow({ item, onUpdate, onDelete }: FixoRowProps) {
           <Input
             autoFocus
             value={nome}
-            onChange={e => setNome(e.target.value)}
+            onChange={e => handleNomeChange(e.target.value)}
             placeholder="Nome do gasto"
             className="h-8 text-sm bg-background border-primary text-foreground"
           />
@@ -113,7 +124,7 @@ function FixoRow({ item, onUpdate, onDelete }: FixoRowProps) {
               min={0}
               step={100}
               value={valor}
-              onChange={e => setValor(e.target.value)}
+              onChange={e => handleValorChange(e.target.value)}
               placeholder="0"
               className="pl-8 h-8 text-sm bg-background border-border text-foreground"
             />
