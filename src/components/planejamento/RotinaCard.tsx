@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import { CheckCircle2, Circle, ChevronDown, ChevronUp, AlertCircle, Loader2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { CheckCircle2, Circle, ChevronDown, ChevronUp, AlertCircle, Loader2, History, CalendarDays, Check, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Progress } from '@/components/ui/progress'
-import { saveExecucaoRotina, getCurrentUserId } from '@/lib/api/data-service'
+import { saveExecucaoRotina, getCurrentUserId, getHistoricoExecucoesRotina } from '@/lib/api/data-service'
 
 export type FrequenciaRotina = 'DIARIA' | 'SEMANAL' | 'QUINZENAL' | 'MENSAL'
 export type CategoriaRotina = 'Financeiro' | 'Comercial' | 'Operacional' | 'RH' | 'Marketing'
@@ -58,6 +58,24 @@ const CAT_COLORS: Record<string, string> = {
   Marketing: 'bg-violet-500/15 text-violet-500 border-violet-500/30',
 }
 
+function parseDiaSemana(dia: string): number {
+  const map: Record<string, number> = {
+    domingo: 0, segunda: 1, terca: 2, quarta: 3, quinta: 4, sexta: 5, sabado: 6,
+    'segunda-feira': 1, 'terca-feira': 2, 'quarta-feira': 3, 'quinta-feira': 4, 'sexta-feira': 5,
+  }
+  return map[dia.toLowerCase()] ?? 1
+}
+
+function formatDateBR(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-')
+  return `${d}/${m}`
+}
+
+function getDayName(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00')
+  return d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')
+}
+
 interface ExecucaoState {
   [itemId: string]: {
     checked: boolean
@@ -74,6 +92,55 @@ export function RotinaCard({ rotina, onFinalizar }: RotinaCardProps) {
   )
   const [finalizado, setFinalizado] = useState(false)
   const [salvando, setSalvando] = useState(false)
+  const [showHistorico, setShowHistorico] = useState(false)
+  const [historico, setHistorico] = useState<{ data: string; concluida: boolean }[]>([])
+  const [loadingHistorico, setLoadingHistorico] = useState(false)
+
+  useEffect(() => {
+    if (!showHistorico) return
+    setLoadingHistorico(true)
+    getHistoricoExecucoesRotina(rotina.id, 30)
+      .then((execucoes) => {
+        // Group executions by date (YYYY-MM-DD) — a day is "concluida" if any execution exists
+        const diasExecutados = new Set<string>()
+        for (const exec of execucoes) {
+          const d = new Date(exec.dataExecucao).toISOString().split('T')[0]
+          diasExecutados.add(d)
+        }
+
+        // Build last 30 days array, filtering by frequency
+        const dias: { data: string; concluida: boolean }[] = []
+        const hoje = new Date()
+        for (let i = 0; i < 30; i++) {
+          const d = new Date(hoje)
+          d.setDate(d.getDate() - i)
+          const dateStr = d.toISOString().split('T')[0]
+          const dayOfWeek = d.getDay() // 0=Sun, 6=Sat
+
+          // Filter days based on frequency
+          let shouldShow = true
+          if (rotina.frequencia === 'DIARIA') {
+            shouldShow = dayOfWeek !== 0 && dayOfWeek !== 6 // weekdays only
+          } else if (rotina.frequencia === 'SEMANAL') {
+            const targetDay = rotina.diaExecucao ? parseDiaSemana(rotina.diaExecucao) : 1
+            shouldShow = dayOfWeek === targetDay
+          } else if (rotina.frequencia === 'QUINZENAL') {
+            // Show every other week
+            const weekNum = Math.floor(d.getTime() / (7 * 24 * 60 * 60 * 1000))
+            shouldShow = weekNum % 2 === 0 && dayOfWeek === (rotina.diaExecucao ? parseDiaSemana(rotina.diaExecucao) : 1)
+          } else if (rotina.frequencia === 'MENSAL') {
+            shouldShow = d.getDate() === (typeof rotina.diaExecucao === 'string' ? parseInt(rotina.diaExecucao) || 1 : 1)
+          }
+
+          if (shouldShow) {
+            dias.push({ data: dateStr, concluida: diasExecutados.has(dateStr) })
+          }
+        }
+        setHistorico(dias)
+      })
+      .catch(console.error)
+      .finally(() => setLoadingHistorico(false))
+  }, [showHistorico, rotina.id, rotina.frequencia, rotina.diaExecucao])
 
   const checkedCount = rotina.itens.filter((it) => execucao[it.id]?.checked).length
   const totalCount = rotina.itens.length
@@ -203,6 +270,15 @@ export function RotinaCard({ rotina, onFinalizar }: RotinaCardProps) {
               {salvando ? 'Salvando...' : 'Finalizar Rotina'}
             </Button>
           )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setShowHistorico((p) => !p)}
+            className="gap-1.5 h-8 text-xs"
+          >
+            <History size={12} />
+            {showHistorico ? 'Ocultar Historico' : 'Historico'}
+          </Button>
           {!finalizado && obrigatoriosNaoFeitos.length > 0 && checkedCount > 0 && (
             <span className="text-xs text-orange-500 flex items-center gap-1">
               <AlertCircle size={12} />
@@ -211,6 +287,76 @@ export function RotinaCard({ rotina, onFinalizar }: RotinaCardProps) {
           )}
         </div>
       </div>
+
+      {/* Historico de execucoes */}
+      {showHistorico && (
+        <div className="px-5 pb-4 border-t border-border pt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <CalendarDays size={14} className="text-muted-foreground" />
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Historico - Ultimos 30 dias
+            </h4>
+          </div>
+          {loadingHistorico ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 size={16} className="animate-spin text-muted-foreground" />
+            </div>
+          ) : historico.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-2">Nenhum registro de execucao nos ultimos 30 dias.</p>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-3 w-3 rounded-sm bg-green-500" />
+                  <span className="text-xs text-muted-foreground">Realizada</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="h-3 w-3 rounded-sm bg-red-500/70" />
+                  <span className="text-xs text-muted-foreground">Nao realizada</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-7 gap-1.5 sm:grid-cols-10">
+                {historico.map((dia) => (
+                  <div
+                    key={dia.data}
+                    className={`relative flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-center ${
+                      dia.concluida
+                        ? 'bg-green-500/15 border border-green-500/30'
+                        : 'bg-red-500/10 border border-red-500/20'
+                    }`}
+                    title={`${formatDateBR(dia.data)} - ${dia.concluida ? 'Realizada' : 'Nao realizada'}`}
+                  >
+                    <span className="text-[10px] text-muted-foreground leading-none">
+                      {getDayName(dia.data)}
+                    </span>
+                    <span className="text-xs font-medium leading-none">
+                      {formatDateBR(dia.data)}
+                    </span>
+                    {dia.concluida ? (
+                      <Check size={12} className="text-green-500" />
+                    ) : (
+                      <X size={12} className="text-red-500/70" />
+                    )}
+                  </div>
+                ))}
+              </div>
+              {(() => {
+                const total = historico.length
+                const feitas = historico.filter(d => d.concluida).length
+                const pct = total > 0 ? Math.round((feitas / total) * 100) : 0
+                return (
+                  <div className="mt-3 flex items-center gap-3 text-xs">
+                    <span className="text-muted-foreground">
+                      Taxa de cumprimento: <span className={`font-semibold ${pct >= 80 ? 'text-green-500' : pct >= 50 ? 'text-orange-500' : 'text-red-500'}`}>{pct}%</span>
+                    </span>
+                    <span className="text-muted-foreground">({feitas}/{total} execucoes)</span>
+                  </div>
+                )
+              })()}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Checklist - always interactive */}
       {expanded && (

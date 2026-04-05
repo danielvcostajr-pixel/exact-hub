@@ -303,6 +303,23 @@ export async function getUltimaExecucaoRotina(rotinaId: string) {
   return data
 }
 
+export async function getHistoricoExecucoesRotina(rotinaId: string, dias: number = 30) {
+  const supabase = createClient()
+  const { data: itens } = await supabase.from('ItemControle').select('id').eq('rotinaId', rotinaId)
+  if (!itens || itens.length === 0) return []
+  const itemIds = itens.map(i => i.id)
+  const desde = new Date()
+  desde.setDate(desde.getDate() - dias)
+  const { data, error } = await supabase
+    .from('ExecucaoItemControle')
+    .select('id, itemControleId, dataExecucao, concluido, observacao, executadoPorId')
+    .in('itemControleId', itemIds)
+    .gte('dataExecucao', desde.toISOString())
+    .order('dataExecucao', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
 // ── Planos de Acao ───────────────────────────────────────────────────────────
 
 export async function getPlanosAcaoByEmpresa(empresaId: string) {
