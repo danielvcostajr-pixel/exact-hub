@@ -150,7 +150,7 @@ export default function PontoEquilibrioPage() {
     if (!clienteAtivo) return
     async function loadSaved() {
       try {
-        const saved = await getSimuladorByEmpresa(clienteAtivo!.id, 'ponto-equilibrio')
+        const saved = await getSimuladorByEmpresa(clienteAtivo!.id, 'PONTO_EQUILIBRIO')
         if (saved?.inputs) {
           const inputs = saved.inputs as {
             custosFixos?: string
@@ -185,7 +185,7 @@ export default function PontoEquilibrioPage() {
       const userId = await getCurrentUserId()
       await saveSimulador({
         empresaId: clienteAtivo.id,
-        tipo: 'ponto-equilibrio',
+        tipo: 'PONTO_EQUILIBRIO',
         nome: 'Ponto de Equilíbrio',
         inputs: {
           custosFixos,
@@ -823,7 +823,7 @@ export default function PontoEquilibrioPage() {
         {clienteAtivo && (
           <SimulacaoHistorico
             empresaId={clienteAtivo.id}
-            tipo="ponto-equilibrio"
+            tipo="PONTO_EQUILIBRIO"
             onLoad={handleLoadSimulacao}
             refreshKey={refreshKey}
           />

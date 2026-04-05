@@ -187,7 +187,7 @@ export default function CenariosPage() {
     if (!clienteAtivo) return
     async function loadSaved() {
       try {
-        const saved = await getSimuladorByEmpresa(clienteAtivo!.id, 'cenarios')
+        const saved = await getSimuladorByEmpresa(clienteAtivo!.id, 'CENARIOS_FINANCEIROS')
         if (saved?.inputs) {
           const inputs = saved.inputs as { base?: BaseData; cenarios?: Cenario[] }
           if (inputs.base) setBase(inputs.base)
@@ -210,7 +210,7 @@ export default function CenariosPage() {
       const res = cenarios.map((c) => calcularCenario(base, c))
       await saveSimulador({
         empresaId: clienteAtivo.id,
-        tipo: 'cenarios',
+        tipo: 'CENARIOS_FINANCEIROS',
         nome: 'Cenarios Financeiros',
         inputs: { base, cenarios },
         outputs: { resultados: res },
@@ -615,7 +615,7 @@ export default function CenariosPage() {
       {clienteAtivo && (
         <SimulacaoHistorico
           empresaId={clienteAtivo.id}
-          tipo="cenarios"
+          tipo="CENARIOS_FINANCEIROS"
           onLoad={handleLoadSimulacao}
           refreshKey={refreshKey}
         />

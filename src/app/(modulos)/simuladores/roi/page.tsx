@@ -236,7 +236,7 @@ export default function ROIPage() {
     if (!clienteAtivo) return
     async function loadSaved() {
       try {
-        const saved = await getSimuladorByEmpresa(clienteAtivo!.id, 'roi')
+        const saved = await getSimuladorByEmpresa(clienteAtivo!.id, 'ROI_INVESTIMENTO')
         if (saved?.inputs) {
           const inputs = saved.inputs as Partial<InputData>
           setInput((prev) => ({ ...prev, ...inputs }))
@@ -258,7 +258,7 @@ export default function ROIPage() {
       const res = calculado ? resultado : calcularKPIs(input)
       await saveSimulador({
         empresaId: clienteAtivo.id,
-        tipo: 'roi',
+        tipo: 'ROI_INVESTIMENTO',
         nome: 'ROI de Investimentos',
         inputs: input,
         outputs: { resultado: res },
@@ -723,7 +723,7 @@ export default function ROIPage() {
       {clienteAtivo && (
         <SimulacaoHistorico
           empresaId={clienteAtivo.id}
-          tipo="roi"
+          tipo="ROI_INVESTIMENTO"
           onLoad={handleLoadSimulacao}
           refreshKey={refreshKey}
         />
