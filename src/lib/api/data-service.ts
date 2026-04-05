@@ -35,6 +35,13 @@ export async function getUsuarios() {
   return data
 }
 
+export async function getUsuariosByEmpresa(empresaId: string) {
+  const supabase = createClient()
+  const { data, error } = await supabase.from('Usuario').select('id, nome, email, papel').eq('empresaId', empresaId).order('nome')
+  if (error) throw error
+  return data
+}
+
 // ── Empresas ─────────────────────────────────────────────────────────────────
 
 export async function getEmpresas() {
