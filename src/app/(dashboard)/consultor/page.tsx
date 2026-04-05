@@ -62,7 +62,7 @@ import {
   CartesianGrid,
 } from "recharts"
 import { useClienteContext, ClienteInfo } from "@/hooks/useClienteContext"
-import { createEmpresa, deleteEmpresa, getProjecaoByEmpresa, getCanvasByEmpresa, getOKRsByEmpresa, getReunioesByEmpresa, getTarefasByEmpresa, getAllTimesheet } from "@/lib/api/data-service"
+import { createEmpresa, deleteEmpresa, getProjecaoByEmpresa, getCanvasByEmpresa, getOKRsByEmpresa, getReunioesByEmpresa, getTarefasByEmpresa, getAllTimesheet, getTimesheetByEmpresa } from "@/lib/api/data-service"
 import { cn } from "@/lib/utils"
 import { gerarResultadoProfecia, calcularKPIs, formatarMoeda, MESES } from "@/lib/calculations/financeiro"
 import { gerarProjecaoCenarios, getFaturamentoCenario } from "@/lib/calculations/cenarios"
@@ -919,6 +919,7 @@ function ClientFocusedView({ clientId }: { clientId: string }) {
   const { clientes } = useClienteContext()
   const [activeTab, setActiveTab] = useState<FocusTab>("visao-geral")
   const [okrSummary, setOkrSummary] = useState({ total: 0, concluidos: 0 })
+  const [horasWeek, setHorasWeek] = useState(0)
 
   const clienteInfo = clientes.find((c) => c.id === clientId)
   const client = clienteInfo ? mapClienteToClient(clienteInfo) : null
@@ -937,6 +938,27 @@ function ClientFocusedView({ clientId }: { clientId: string }) {
       } catch { /* ignore */ }
     }
     loadOKRSummary()
+  }, [clientId])
+
+  // Fetch timesheet hours for last 7 days for this client
+  useEffect(() => {
+    async function loadTimesheetHours() {
+      try {
+        const entries = await getTimesheetByEmpresa(clientId)
+        if (entries) {
+          const now = new Date()
+          const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          const weekEntries = entries.filter((e: { data?: string }) => {
+            if (!e.data) return false
+            const entryDate = new Date(e.data)
+            return entryDate >= sevenDaysAgo && entryDate <= now
+          })
+          const totalMinutes = weekEntries.reduce((acc: number, e: { duracaoMinutos?: number }) => acc + (e.duracaoMinutos ?? 0), 0)
+          setHorasWeek(totalMinutes / 60)
+        }
+      } catch { /* ignore */ }
+    }
+    loadTimesheetHours()
   }, [clientId])
 
   if (!client) return null
@@ -983,7 +1005,6 @@ function ClientFocusedView({ clientId }: { clientId: string }) {
   const cfg = phaseConfig[client.phase]
   const clientTasks = realTasks
   const overdueTasks = clientTasks.filter((t) => t.status === "Atrasada").length
-  const horasWeek = 0
 
   const tabs: { key: FocusTab; label: string; icon: React.ElementType }[] = [
     { key: "visao-geral", label: "Visao Geral",  icon: LayoutGrid },
@@ -1252,6 +1273,28 @@ function ConsolidatedView() {
   const [timerRunning] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [allTasks, setAllTasks] = useState<Task[]>([])
+  const [totalHorasWeek, setTotalHorasWeek] = useState(0)
+
+  // Load timesheet hours for last 7 days (all clients)
+  useEffect(() => {
+    async function loadTimesheetHours() {
+      try {
+        const entries = await getAllTimesheet()
+        if (entries) {
+          const now = new Date()
+          const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          const weekEntries = entries.filter((e: { data?: string }) => {
+            if (!e.data) return false
+            const entryDate = new Date(e.data)
+            return entryDate >= sevenDaysAgo && entryDate <= now
+          })
+          const totalMinutes = weekEntries.reduce((acc: number, e: { duracaoMinutos?: number }) => acc + (e.duracaoMinutos ?? 0), 0)
+          setTotalHorasWeek(totalMinutes / 60)
+        }
+      } catch { /* ignore */ }
+    }
+    loadTimesheetHours()
+  }, [])
 
   // Load tasks from all clients
   useEffect(() => {
@@ -1297,7 +1340,6 @@ function ConsolidatedView() {
   const pipelineClients = clientes.map(mapClienteToClient)
   const totalClients    = pipelineClients.length
   const totalPending    = allTasks.length
-  const totalHorasWeek  = 0
   const reunioesWeek    = 0
 
   const filteredTasks =

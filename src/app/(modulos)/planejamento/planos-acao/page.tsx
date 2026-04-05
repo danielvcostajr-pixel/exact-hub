@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, ListChecks, ChevronDown, ChevronUp, Link2, Users, ArrowLeft, Loader2 } from 'lucide-react'
+import { Plus, ListChecks, ChevronDown, ChevronUp, Link2, Users, ArrowLeft, Loader2, CheckCircle2, Circle } from 'lucide-react'
 import { useClienteContext } from '@/hooks/useClienteContext'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -10,9 +10,10 @@ import { Progress } from '@/components/ui/progress'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { MatrizRACI, type AcaoRaci, type UsuarioRaci } from '@/components/planejamento/MatrizRACI'
-import { getPlanosAcaoByEmpresa, createPlanoAcao, createAcao, getUsuarios } from '@/lib/api/data-service'
+import { getPlanosAcaoByEmpresa, createPlanoAcao, createAcao, updateAcao, getUsuarios } from '@/lib/api/data-service'
 
 type StatusAcao = 'Pendente' | 'Em Andamento' | 'Concluida' | 'Bloqueada'
 
@@ -96,9 +97,22 @@ function dbToPlano(row: Record<string, unknown>): PlanoAcao {
   }
 }
 
-function PlanoCard({ plano, usuarios }: { plano: PlanoAcao; usuarios: UsuarioRaci[] }) {
+const DB_STATUS_VALUES: Record<StatusAcao, string> = {
+  Pendente: 'PENDENTE',
+  'Em Andamento': 'EM_ANDAMENTO',
+  Concluida: 'CONCLUIDA',
+  Bloqueada: 'CANCELADA',
+}
+
+function PlanoCard({ plano, usuarios, onReload }: { plano: PlanoAcao; usuarios: UsuarioRaci[]; onReload: () => Promise<void> }) {
   const [expanded, setExpanded] = useState(false)
   const [activeTab, setActiveTab] = useState<'acoes' | 'raci'>('acoes')
+  const [showNovaAcao, setShowNovaAcao] = useState(false)
+  const [novaAcaoDesc, setNovaAcaoDesc] = useState('')
+  const [novaAcaoPrazo, setNovaAcaoPrazo] = useState('')
+  const [novaAcaoStatus, setNovaAcaoStatus] = useState('PENDENTE')
+  const [salvandoAcao, setSalvandoAcao] = useState(false)
+  const [updatingAcaoId, setUpdatingAcaoId] = useState<string | null>(null)
   const progress = calcProgress(plano.acoes)
   const done = plano.acoes.filter((a) => a.status === 'Concluida').length
 
@@ -108,6 +122,54 @@ function PlanoCard({ plano, usuarios }: { plano: PlanoAcao; usuarios: UsuarioRac
     status: a.status,
     atribuicoes: a.atribuicoes,
   }))
+
+  async function handleAdicionarAcao() {
+    if (!novaAcaoDesc.trim()) return
+    setSalvandoAcao(true)
+    try {
+      await createAcao({
+        planoId: plano.id,
+        descricao: novaAcaoDesc.trim(),
+        prazo: novaAcaoPrazo || undefined,
+        status: novaAcaoStatus,
+      })
+      setNovaAcaoDesc('')
+      setNovaAcaoPrazo('')
+      setNovaAcaoStatus('PENDENTE')
+      setShowNovaAcao(false)
+      await onReload()
+    } catch (err) {
+      console.error('Erro ao criar acao:', err)
+      alert('Erro ao criar acao.')
+    } finally {
+      setSalvandoAcao(false)
+    }
+  }
+
+  async function handleToggleConcluida(acao: Acao) {
+    setUpdatingAcaoId(acao.id)
+    try {
+      const newStatus = acao.status === 'Concluida' ? 'PENDENTE' : 'CONCLUIDA'
+      await updateAcao(acao.id, { status: newStatus })
+      await onReload()
+    } catch (err) {
+      console.error('Erro ao atualizar acao:', err)
+    } finally {
+      setUpdatingAcaoId(null)
+    }
+  }
+
+  async function handleChangeStatus(acao: Acao, newStatus: StatusAcao) {
+    setUpdatingAcaoId(acao.id)
+    try {
+      await updateAcao(acao.id, { status: DB_STATUS_VALUES[newStatus] })
+      await onReload()
+    } catch (err) {
+      console.error('Erro ao atualizar status:', err)
+    } finally {
+      setUpdatingAcaoId(null)
+    }
+  }
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden transition-shadow hover:shadow-md">
@@ -200,7 +262,7 @@ function PlanoCard({ plano, usuarios }: { plano: PlanoAcao; usuarios: UsuarioRac
           {/* Acoes tab */}
           {activeTab === 'acoes' && (
             <div className="flex flex-col gap-2">
-              {plano.acoes.length === 0 && (
+              {plano.acoes.length === 0 && !showNovaAcao && (
                 <p className="text-sm text-muted-foreground text-center py-4">Nenhuma acao registrada neste plano.</p>
               )}
               {plano.acoes.map((acao) => (
@@ -208,26 +270,120 @@ function PlanoCard({ plano, usuarios }: { plano: PlanoAcao; usuarios: UsuarioRac
                   key={acao.id}
                   className="flex items-start justify-between gap-3 rounded-lg border border-border bg-background p-3"
                 >
-                  <div className="flex flex-col gap-1 flex-1 min-w-0">
-                    <span className="text-sm text-foreground leading-snug">{acao.descricao}</span>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {acao.responsavel && <span className="text-xs text-muted-foreground">{acao.responsavel.split(' ')[0]}</span>}
-                      {acao.prazo && (
-                        <>
-                          <span className="text-xs text-muted-foreground">•</span>
-                          <span className="text-xs text-muted-foreground">{acao.prazo}</span>
-                        </>
+                  <div className="flex items-start gap-2 flex-1 min-w-0">
+                    <button
+                      onClick={() => handleToggleConcluida(acao)}
+                      disabled={updatingAcaoId === acao.id}
+                      className="mt-0.5 shrink-0 transition-colors"
+                    >
+                      {updatingAcaoId === acao.id ? (
+                        <Loader2 size={16} className="animate-spin text-muted-foreground" />
+                      ) : acao.status === 'Concluida' ? (
+                        <CheckCircle2 size={16} className="text-green-500" />
+                      ) : (
+                        <Circle size={16} className="text-muted-foreground hover:text-primary" />
                       )}
+                    </button>
+                    <div className="flex flex-col gap-1 flex-1 min-w-0">
+                      <span className={`text-sm leading-snug ${acao.status === 'Concluida' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                        {acao.descricao}
+                      </span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {acao.prazo && (
+                          <span className="text-xs text-muted-foreground">{acao.prazo}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <Badge
-                    variant="outline"
-                    className={`text-[10px] border px-1.5 py-0 whitespace-nowrap shrink-0 ${ACAO_STATUS_STYLES[acao.status]}`}
+                  <Select
+                    value={acao.status}
+                    onValueChange={(val) => handleChangeStatus(acao, val as StatusAcao)}
+                    disabled={updatingAcaoId === acao.id}
                   >
-                    {acao.status}
-                  </Badge>
+                    <SelectTrigger className={`h-6 w-auto min-w-[110px] text-[10px] border px-1.5 py-0 ${ACAO_STATUS_STYLES[acao.status]}`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Pendente">Pendente</SelectItem>
+                      <SelectItem value="Em Andamento">Em Andamento</SelectItem>
+                      <SelectItem value="Concluida">Concluida</SelectItem>
+                      <SelectItem value="Bloqueada">Bloqueada</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               ))}
+
+              {/* Inline form for new acao */}
+              {showNovaAcao && (
+                <div className="rounded-lg border border-primary/30 bg-background p-3 flex flex-col gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-xs">Descricao *</Label>
+                    <Input
+                      placeholder="Ex: Mapear concorrentes da regiao"
+                      value={novaAcaoDesc}
+                      onChange={(e) => setNovaAcaoDesc(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1.5">
+                      <Label className="text-xs">Prazo</Label>
+                      <Input
+                        type="date"
+                        value={novaAcaoPrazo}
+                        onChange={(e) => setNovaAcaoPrazo(e.target.value)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label className="text-xs">Status</Label>
+                      <Select value={novaAcaoStatus} onValueChange={setNovaAcaoStatus}>
+                        <SelectTrigger className="h-8 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="PENDENTE">Pendente</SelectItem>
+                          <SelectItem value="EM_ANDAMENTO">Em Andamento</SelectItem>
+                          <SelectItem value="CONCLUIDA">Concluida</SelectItem>
+                          <SelectItem value="CANCELADA">Cancelada</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowNovaAcao(false)}
+                      className="h-7 text-xs"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={!novaAcaoDesc.trim() || salvandoAcao}
+                      onClick={handleAdicionarAcao}
+                      className="h-7 text-xs bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white gap-1"
+                    >
+                      {salvandoAcao && <Loader2 size={12} className="animate-spin" />}
+                      Salvar Acao
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Add acao button */}
+              {!showNovaAcao && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowNovaAcao(true)}
+                  className="w-full h-8 text-xs gap-1.5 border-dashed text-muted-foreground hover:text-foreground"
+                >
+                  <Plus size={14} />
+                  Nova Acao
+                </Button>
+              )}
             </div>
           )}
 
@@ -383,7 +539,7 @@ export default function PlanosAcaoPage() {
           {/* Plans list */}
           <div className="flex flex-col gap-3">
             {planos.map((plano) => (
-              <PlanoCard key={plano.id} plano={plano} usuarios={usuarios} />
+              <PlanoCard key={plano.id} plano={plano} usuarios={usuarios} onReload={loadData} />
             ))}
             {planos.length === 0 && (
               <div className="flex flex-col items-center justify-center py-16 gap-4">

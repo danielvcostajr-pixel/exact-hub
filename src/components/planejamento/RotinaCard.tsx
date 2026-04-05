@@ -167,7 +167,7 @@ export function RotinaCard({ rotina, onFinalizar }: RotinaCardProps) {
         {/* Meta info */}
         <div className="flex items-center gap-4 flex-wrap">
           <span className="text-xs text-muted-foreground">
-            {rotina.itens.length} item{rotina.itens.length !== 1 ? 's' : ''} de controle
+            {rotina.itens.length} ite{rotina.itens.length !== 1 ? 'ns' : 'm'} do checklist
           </span>
           <span className="text-xs text-muted-foreground">•</span>
           <span className="text-xs text-muted-foreground">
@@ -216,7 +216,7 @@ export function RotinaCard({ rotina, onFinalizar }: RotinaCardProps) {
       {expanded && (
         <div className="px-5 pb-5 border-t border-border pt-4 flex flex-col gap-2">
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-            Itens de Controle
+            Checklist da Rotina
           </h4>
           {rotina.itens.map((item) => {
             const state = execucao[item.id]

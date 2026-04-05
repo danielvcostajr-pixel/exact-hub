@@ -232,7 +232,7 @@ export default function OKRsPage() {
       {/* OKR List */}
       <div className="flex flex-col gap-3">
         {sortedOkrs.map((okr) => (
-          <OKRCard key={okr.id} okr={okr} onUpdateKRValor={handleUpdateKR} />
+          <OKRCard key={okr.id} okr={okr} empresaId={clienteAtivo!.id} onUpdateKRValor={handleUpdateKR} />
         ))}
         {okrs.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 gap-4">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -9,8 +9,11 @@ import {
   Plus,
   Trash2,
   TrendingUp,
+  Loader2,
+  CheckCircle,
 } from 'lucide-react'
 import { useClienteContext } from '@/hooks/useClienteContext'
+import { saveSimulador, getSimuladorByEmpresa, getCurrentUserId } from '@/lib/api/data-service'
 import {
   LineChart,
   Line,
@@ -162,6 +165,50 @@ export default function CenariosPage() {
   const [cenarios, setCenarios] = useState<Cenario[]>(CENARIOS_DEFAULT)
   const [resultados, setResultados] = useState<CenarioResult[] | null>(null)
   const [simulado, setSimulado] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [savedAt, setSavedAt] = useState<string | null>(null)
+
+  // Load saved data on mount
+  useEffect(() => {
+    if (!clienteAtivo) return
+    async function loadSaved() {
+      try {
+        const saved = await getSimuladorByEmpresa(clienteAtivo!.id, 'cenarios')
+        if (saved?.inputs) {
+          const inputs = saved.inputs as { base?: BaseData; cenarios?: Cenario[] }
+          if (inputs.base) setBase(inputs.base)
+          if (inputs.cenarios) setCenarios(inputs.cenarios)
+          if (saved.updatedAt) {
+            setSavedAt(new Date(saved.updatedAt).toLocaleString('pt-BR'))
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    loadSaved()
+  }, [clienteAtivo])
+
+  // Save handler
+  const handleSave = useCallback(async () => {
+    if (!clienteAtivo) return
+    setSaving(true)
+    try {
+      const userId = await getCurrentUserId()
+      const res = cenarios.map((c) => calcularCenario(base, c))
+      await saveSimulador({
+        empresaId: clienteAtivo.id,
+        tipo: 'cenarios',
+        nome: 'Cenarios Financeiros',
+        inputs: { base, cenarios },
+        outputs: { resultados: res },
+        criadoPorId: userId || 'system',
+      })
+      setSavedAt(new Date().toLocaleString('pt-BR'))
+    } catch (err) {
+      console.error('Erro ao salvar simulador:', err)
+    } finally {
+      setSaving(false)
+    }
+  }, [clienteAtivo, base, cenarios])
 
   const handleSimular = useCallback(() => {
     const res = cenarios.map((c) => calcularCenario(base, c))
@@ -252,9 +299,13 @@ export default function CenariosPage() {
             <History size={14} />
             Historico
           </button>
-          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors">
-            <Save size={14} />
-            Salvar
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors disabled:opacity-50"
+          >
+            {saving ? <Loader2 size={14} className="animate-spin" /> : savedAt ? <CheckCircle size={14} className="text-green-500" /> : <Save size={14} />}
+            {saving ? 'Salvando...' : savedAt ? `Salvo ${savedAt}` : 'Salvar'}
           </button>
         </div>
       </div>

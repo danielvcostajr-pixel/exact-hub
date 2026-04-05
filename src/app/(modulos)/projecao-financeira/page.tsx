@@ -529,6 +529,25 @@ export default function ProjecaoFinanceiraPage() {
         <p className="text-xs text-muted-foreground mt-0.5">
           Modelo PROFECIA — {clienteAtivo?.nome ?? 'Cliente'} · {anoProjecao}
         </p>
+
+        {/* Saldo Inicial de Caixa */}
+        <div className="mt-3 flex items-center gap-3">
+          <label className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+            Saldo Inicial de Caixa
+          </label>
+          <div className="relative">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">R$</span>
+            <input
+              type="number"
+              min={0}
+              step={100}
+              value={dados.saldoInicial}
+              onChange={(e) => setDados((d) => ({ ...d, saldoInicial: Number(e.target.value) || 0 }))}
+              className="w-44 pl-8 pr-3 py-1.5 rounded-lg border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+              placeholder="0,00"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Mobile step bar */}

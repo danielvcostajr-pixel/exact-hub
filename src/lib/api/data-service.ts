@@ -190,6 +190,7 @@ export async function getTarefasByEmpresa(empresaId: string) {
 export async function createTarefa(params: {
   empresaId: string; titulo: string; descricao?: string; status?: string
   prioridade?: string; prazo?: string; responsavelId?: string; criadoPorId: string
+  okrId?: string
 }) {
   const supabase = createClient()
   const { data, error } = await supabase.from('Tarefa').insert({
@@ -197,6 +198,7 @@ export async function createTarefa(params: {
     descricao: params.descricao ?? null, status: params.status ?? 'BACKLOG',
     prioridade: params.prioridade ?? 'MEDIA', prazo: params.prazo ?? null,
     responsavelId: params.responsavelId ?? null, criadoPorId: params.criadoPorId,
+    okrId: params.okrId ?? null,
   }).select().single()
   if (error) throw error
   return data

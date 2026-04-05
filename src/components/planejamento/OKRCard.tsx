@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, Check, Pencil } from 'lucide-react'
+import { ChevronDown, ChevronUp, Check, Pencil, Plus, Loader2, CheckCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { createTarefa, getCurrentUserId } from '@/lib/api/data-service'
 
 export type OKRStatus = 'Rascunho' | 'Ativo' | 'Concluido' | 'Cancelado'
 
@@ -34,6 +35,7 @@ export interface OKR {
 
 interface OKRCardProps {
   okr: OKR
+  empresaId: string
   onUpdateKRValor: (okrId: string, krId: string, novoValor: number) => void
 }
 
@@ -71,19 +73,53 @@ const STATUS_STYLES: Record<OKRStatus, string> = {
 
 function KRRow({
   kr,
+  okrId,
+  empresaId,
   onUpdate,
 }: {
   kr: KeyResult
+  okrId: string
+  empresaId: string
   onUpdate: (newVal: number) => void
 }) {
   const [editing, setEditing] = useState(false)
   const [tempVal, setTempVal] = useState(String(kr.valorAtual))
   const pct = calcProgress(kr)
 
+  // Inline tarefa creation state
+  const [showTarefaInput, setShowTarefaInput] = useState(false)
+  const [tarefaTitulo, setTarefaTitulo] = useState('')
+  const [savingTarefa, setSavingTarefa] = useState(false)
+  const [tarefaCriada, setTarefaCriada] = useState(false)
+
   function handleSave() {
     const val = parseFloat(tempVal)
     if (!isNaN(val)) onUpdate(val)
     setEditing(false)
+  }
+
+  async function handleCreateTarefa() {
+    if (!tarefaTitulo.trim()) return
+    setSavingTarefa(true)
+    try {
+      const userId = await getCurrentUserId()
+      await createTarefa({
+        empresaId,
+        titulo: tarefaTitulo.trim(),
+        okrId,
+        criadoPorId: userId || 'system',
+      })
+      setTarefaCriada(true)
+      setTarefaTitulo('')
+      setTimeout(() => {
+        setTarefaCriada(false)
+        setShowTarefaInput(false)
+      }, 2000)
+    } catch (err) {
+      console.error('Erro ao criar tarefa:', err)
+    } finally {
+      setSavingTarefa(false)
+    }
   }
 
   return (
@@ -150,11 +186,61 @@ function KRRow({
           {kr.responsavelNome.split(' ')[0]}
         </span>
       </div>
+
+      {/* + Tarefa button and inline input */}
+      <div className="flex items-center gap-2">
+        {tarefaCriada ? (
+          <span className="flex items-center gap-1 text-xs text-green-500 font-medium">
+            <CheckCircle size={12} />
+            Tarefa criada!
+          </span>
+        ) : showTarefaInput ? (
+          <div className="flex items-center gap-1 flex-1">
+            <Input
+              type="text"
+              placeholder="Titulo da tarefa..."
+              value={tarefaTitulo}
+              onChange={(e) => setTarefaTitulo(e.target.value)}
+              className="h-6 text-xs bg-card border-border text-foreground px-2 flex-1"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreateTarefa()
+                if (e.key === 'Escape') { setShowTarefaInput(false); setTarefaTitulo('') }
+              }}
+              autoFocus
+              disabled={savingTarefa}
+            />
+            <Button
+              size="sm"
+              onClick={handleCreateTarefa}
+              disabled={savingTarefa || !tarefaTitulo.trim()}
+              className="h-6 px-2 text-xs bg-primary hover:bg-primary/90 text-white gap-1"
+            >
+              {savingTarefa ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => { setShowTarefaInput(false); setTarefaTitulo('') }}
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+            >
+              &times;
+            </Button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowTarefaInput(true)}
+            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors"
+          >
+            <Plus size={11} />
+            Tarefa
+          </button>
+        )}
+      </div>
     </div>
   )
 }
 
-export function OKRCard({ okr, onUpdateKRValor }: OKRCardProps) {
+export function OKRCard({ okr, empresaId, onUpdateKRValor }: OKRCardProps) {
   const [expanded, setExpanded] = useState(false)
   const overall = calcOverallProgress(okr)
 
@@ -227,6 +313,8 @@ export function OKRCard({ okr, onUpdateKRValor }: OKRCardProps) {
             <KRRow
               key={kr.id}
               kr={kr}
+              okrId={okr.id}
+              empresaId={empresaId}
               onUpdate={(val) => onUpdateKRValor(okr.id, kr.id, val)}
             />
           ))}

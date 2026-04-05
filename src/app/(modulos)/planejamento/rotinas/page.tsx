@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, RotateCcw, Copy, ArrowLeft, Loader2, X } from 'lucide-react'
+import { Plus, RotateCcw, Copy, ArrowLeft, Loader2, X, Trash2 } from 'lucide-react'
 import { useClienteContext } from '@/hooks/useClienteContext'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { RotinaCard, type Rotina } from '@/components/planejamento/RotinaCard'
 import { ROTINAS_TEMPLATES, type RotinaTemplate } from '@/lib/templates/rotinas'
@@ -77,6 +78,19 @@ export default function RotinasPage() {
   const [formFrequencia, setFormFrequencia] = useState('SEMANAL')
   const [formCategoria, setFormCategoria] = useState('Operacional')
   const [formHora, setFormHora] = useState('')
+  const [formItens, setFormItens] = useState<{ descricao: string; obrigatorio: boolean }[]>([])
+
+  function addChecklistItem() {
+    setFormItens((prev) => [...prev, { descricao: '', obrigatorio: false }])
+  }
+
+  function removeChecklistItem(index: number) {
+    setFormItens((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  function updateChecklistItem(index: number, field: 'descricao' | 'obrigatorio', value: string | boolean) {
+    setFormItens((prev) => prev.map((it, i) => (i === index ? { ...it, [field]: value } : it)))
+  }
 
   const loadRotinas = useCallback(async () => {
     if (!clienteAtivo) return
@@ -140,6 +154,7 @@ export default function RotinasPage() {
     setFormFrequencia('SEMANAL')
     setFormCategoria('Operacional')
     setFormHora('')
+    setFormItens([])
     setDialogOpen(true)
   }
 
@@ -150,7 +165,7 @@ export default function RotinasPage() {
       const userId = await getCurrentUserId()
       if (!userId) { alert('Usuario nao autenticado'); return }
 
-      await createRotina({
+      const novaRotina = await createRotina({
         empresaId: clienteAtivo.id,
         nome: formNome.trim(),
         descricao: formDescricao.trim() || undefined,
@@ -159,6 +174,17 @@ export default function RotinasPage() {
         hora: formHora || undefined,
         responsavelId: userId,
       })
+
+      // Create checklist items
+      const itensValidos = formItens.filter((it) => it.descricao.trim())
+      for (let i = 0; i < itensValidos.length; i++) {
+        await createItemControle({
+          rotinaId: novaRotina.id,
+          descricao: itensValidos[i].descricao.trim(),
+          ordem: i + 1,
+          obrigatorio: itensValidos[i].obrigatorio,
+        })
+      }
 
       setDialogOpen(false)
       await loadRotinas()
@@ -335,7 +361,7 @@ export default function RotinasPage() {
 
       {/* Dialog Nova Rotina */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nova Rotina</DialogTitle>
           </DialogHeader>
@@ -398,6 +424,57 @@ export default function RotinasPage() {
                 value={formHora}
                 onChange={(e) => setFormHora(e.target.value)}
               />
+            </div>
+
+            {/* Checklist da Rotina */}
+            <div className="flex flex-col gap-2 border-t border-border pt-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">Checklist da Rotina</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={addChecklistItem}
+                  className="h-7 text-xs text-primary gap-1"
+                >
+                  <Plus size={12} />
+                  Adicionar item
+                </Button>
+              </div>
+              {formItens.length === 0 && (
+                <p className="text-xs text-muted-foreground">Nenhum item adicionado. Clique em &quot;Adicionar item&quot; para incluir itens no checklist.</p>
+              )}
+              {formItens.map((item, idx) => (
+                <div key={idx} className="flex items-start gap-2 rounded-lg border border-border bg-background p-2.5">
+                  <div className="flex flex-col gap-2 flex-1">
+                    <Input
+                      placeholder={`Item ${idx + 1} — ex: Conferir saldo bancario`}
+                      value={item.descricao}
+                      onChange={(e) => updateChecklistItem(idx, 'descricao', e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id={`obrigatorio-${idx}`}
+                        checked={item.obrigatorio}
+                        onCheckedChange={(checked) => updateChecklistItem(idx, 'obrigatorio', !!checked)}
+                      />
+                      <label htmlFor={`obrigatorio-${idx}`} className="text-xs text-muted-foreground cursor-pointer">
+                        Obrigatorio
+                      </label>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeChecklistItem(idx)}
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500 shrink-0 mt-0.5"
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                </div>
+              ))}
             </div>
           </div>
           <DialogFooter>

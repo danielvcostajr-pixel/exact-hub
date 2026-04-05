@@ -30,7 +30,7 @@ function calcularMediaLTM(historico: HistoricoFaturamento[], meses = 12): number
  * Se não houver dados suficientes, retorna todos os fatores como 1.
  */
 function calcularFatoresSazonais(historico: HistoricoFaturamento[]): number[] {
-  if (historico.length < 12) return new Array(12).fill(1)
+  if (historico.length === 0) return new Array(12).fill(1)
 
   // Agrupar valores por mês (1–12)
   const porMes: Record<number, number[]> = {}
@@ -45,6 +45,7 @@ function calcularFatoresSazonais(historico: HistoricoFaturamento[]): number[] {
   return Array.from({ length: 12 }, (_, i) => {
     const mes = i + 1
     const valores = porMes[mes] ?? []
+    // Meses sem dados usam a média geral (fator = 1)
     if (valores.length === 0) return 1
     const mediaMes = valores.reduce((sum, v) => sum + v, 0) / valores.length
     return mediaMes / mediaGeral
