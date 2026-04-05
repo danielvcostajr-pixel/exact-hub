@@ -93,7 +93,7 @@ export function RotinaCard({ rotina, onFinalizar }: RotinaCardProps) {
   const [finalizado, setFinalizado] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [showHistorico, setShowHistorico] = useState(false)
-  const [historico, setHistorico] = useState<{ data: string; concluida: boolean }[]>([])
+  const [historico, setHistorico] = useState<{ data: string; status: 'realizada' | 'atrasada' | 'nao_realizada' }[]>([])
   const [loadingHistorico, setLoadingHistorico] = useState(false)
 
   useEffect(() => {
@@ -101,41 +101,55 @@ export function RotinaCard({ rotina, onFinalizar }: RotinaCardProps) {
     setLoadingHistorico(true)
     getHistoricoExecucoesRotina(rotina.id, 30)
       .then((execucoes) => {
-        // Group executions by date (YYYY-MM-DD) — a day is "concluida" if any execution exists
         const diasExecutados = new Set<string>()
         for (const exec of execucoes) {
           const d = new Date(exec.dataExecucao).toISOString().split('T')[0]
           diasExecutados.add(d)
         }
 
-        // Build last 30 days array, filtering by frequency
-        const dias: { data: string; concluida: boolean }[] = []
+        function isDiaEsperado(dateStr: string): boolean {
+          const d = new Date(dateStr + 'T12:00:00')
+          const dayOfWeek = d.getDay()
+          if (rotina.frequencia === 'DIARIA') return dayOfWeek !== 0 && dayOfWeek !== 6
+          if (rotina.frequencia === 'SEMANAL') {
+            const targetDay = rotina.diaExecucao ? parseDiaSemana(rotina.diaExecucao) : 1
+            return dayOfWeek === targetDay
+          }
+          if (rotina.frequencia === 'QUINZENAL') {
+            const weekNum = Math.floor(d.getTime() / (7 * 24 * 60 * 60 * 1000))
+            return weekNum % 2 === 0 && dayOfWeek === (rotina.diaExecucao ? parseDiaSemana(rotina.diaExecucao) : 1)
+          }
+          if (rotina.frequencia === 'MENSAL') {
+            return d.getDate() === (typeof rotina.diaExecucao === 'string' ? parseInt(rotina.diaExecucao) || 1 : 1)
+          }
+          return true
+        }
+
+        const diasMap = new Map<string, 'realizada' | 'atrasada' | 'nao_realizada'>()
         const hoje = new Date()
+
+        // First: add all expected days
         for (let i = 0; i < 30; i++) {
           const d = new Date(hoje)
           d.setDate(d.getDate() - i)
           const dateStr = d.toISOString().split('T')[0]
-          const dayOfWeek = d.getDay() // 0=Sun, 6=Sat
-
-          // Filter days based on frequency
-          let shouldShow = true
-          if (rotina.frequencia === 'DIARIA') {
-            shouldShow = dayOfWeek !== 0 && dayOfWeek !== 6 // weekdays only
-          } else if (rotina.frequencia === 'SEMANAL') {
-            const targetDay = rotina.diaExecucao ? parseDiaSemana(rotina.diaExecucao) : 1
-            shouldShow = dayOfWeek === targetDay
-          } else if (rotina.frequencia === 'QUINZENAL') {
-            // Show every other week
-            const weekNum = Math.floor(d.getTime() / (7 * 24 * 60 * 60 * 1000))
-            shouldShow = weekNum % 2 === 0 && dayOfWeek === (rotina.diaExecucao ? parseDiaSemana(rotina.diaExecucao) : 1)
-          } else if (rotina.frequencia === 'MENSAL') {
-            shouldShow = d.getDate() === (typeof rotina.diaExecucao === 'string' ? parseInt(rotina.diaExecucao) || 1 : 1)
-          }
-
-          if (shouldShow) {
-            dias.push({ data: dateStr, concluida: diasExecutados.has(dateStr) })
+          if (isDiaEsperado(dateStr)) {
+            diasMap.set(dateStr, diasExecutados.has(dateStr) ? 'realizada' : 'nao_realizada')
           }
         }
+
+        // Then: add execution days that are NOT expected (com atraso)
+        for (const dateStr of diasExecutados) {
+          if (!diasMap.has(dateStr)) {
+            diasMap.set(dateStr, 'atrasada')
+          }
+        }
+
+        // Sort by date descending
+        const dias = Array.from(diasMap.entries())
+          .map(([data, status]) => ({ data, status }))
+          .sort((a, b) => b.data.localeCompare(a.data))
+
         setHistorico(dias)
       })
       .catch(console.error)
@@ -305,10 +319,14 @@ export function RotinaCard({ rotina, onFinalizar }: RotinaCardProps) {
             <p className="text-xs text-muted-foreground py-2">Nenhum registro de execucao nos ultimos 30 dias.</p>
           ) : (
             <>
-              <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center gap-3 mb-3 flex-wrap">
                 <div className="flex items-center gap-1.5">
                   <div className="h-3 w-3 rounded-sm bg-green-500" />
                   <span className="text-xs text-muted-foreground">Realizada</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="h-3 w-3 rounded-sm bg-amber-500" />
+                  <span className="text-xs text-muted-foreground">Concluida com atraso</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="h-3 w-3 rounded-sm bg-red-500/70" />
@@ -316,40 +334,51 @@ export function RotinaCard({ rotina, onFinalizar }: RotinaCardProps) {
                 </div>
               </div>
               <div className="grid grid-cols-7 gap-1.5 sm:grid-cols-10">
-                {historico.map((dia) => (
-                  <div
-                    key={dia.data}
-                    className={`relative flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-center ${
-                      dia.concluida
-                        ? 'bg-green-500/15 border border-green-500/30'
-                        : 'bg-red-500/10 border border-red-500/20'
-                    }`}
-                    title={`${formatDateBR(dia.data)} - ${dia.concluida ? 'Realizada' : 'Nao realizada'}`}
-                  >
-                    <span className="text-[10px] text-muted-foreground leading-none">
-                      {getDayName(dia.data)}
-                    </span>
-                    <span className="text-xs font-medium leading-none">
-                      {formatDateBR(dia.data)}
-                    </span>
-                    {dia.concluida ? (
-                      <Check size={12} className="text-green-500" />
-                    ) : (
-                      <X size={12} className="text-red-500/70" />
-                    )}
-                  </div>
-                ))}
+                {historico.map((dia) => {
+                  const bgClass = dia.status === 'realizada'
+                    ? 'bg-green-500/15 border border-green-500/30'
+                    : dia.status === 'atrasada'
+                    ? 'bg-amber-500/15 border border-amber-500/30'
+                    : 'bg-red-500/10 border border-red-500/20'
+                  const label = dia.status === 'realizada'
+                    ? 'Realizada'
+                    : dia.status === 'atrasada'
+                    ? 'Concluida com atraso'
+                    : 'Nao realizada'
+                  return (
+                    <div
+                      key={dia.data}
+                      className={`relative flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-center ${bgClass}`}
+                      title={`${formatDateBR(dia.data)} - ${label}`}
+                    >
+                      <span className="text-[10px] text-muted-foreground leading-none">
+                        {getDayName(dia.data)}
+                      </span>
+                      <span className="text-xs font-medium leading-none">
+                        {formatDateBR(dia.data)}
+                      </span>
+                      {dia.status === 'realizada' ? (
+                        <Check size={12} className="text-green-500" />
+                      ) : dia.status === 'atrasada' ? (
+                        <Check size={12} className="text-amber-500" />
+                      ) : (
+                        <X size={12} className="text-red-500/70" />
+                      )}
+                    </div>
+                  )
+                })}
               </div>
               {(() => {
-                const total = historico.length
-                const feitas = historico.filter(d => d.concluida).length
-                const pct = total > 0 ? Math.round((feitas / total) * 100) : 0
+                const esperados = historico.filter(d => d.status !== 'atrasada').length
+                const feitas = historico.filter(d => d.status === 'realizada').length
+                const atrasadas = historico.filter(d => d.status === 'atrasada').length
+                const pct = esperados > 0 ? Math.round((feitas / esperados) * 100) : 0
                 return (
-                  <div className="mt-3 flex items-center gap-3 text-xs">
+                  <div className="mt-3 flex items-center gap-3 text-xs flex-wrap">
                     <span className="text-muted-foreground">
                       Taxa de cumprimento: <span className={`font-semibold ${pct >= 80 ? 'text-green-500' : pct >= 50 ? 'text-orange-500' : 'text-red-500'}`}>{pct}%</span>
                     </span>
-                    <span className="text-muted-foreground">({feitas}/{total} execucoes)</span>
+                    <span className="text-muted-foreground">({feitas}/{esperados} no prazo{atrasadas > 0 ? ` + ${atrasadas} com atraso` : ''})</span>
                   </div>
                 )
               })()}
