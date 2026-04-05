@@ -62,7 +62,7 @@ import {
   CartesianGrid,
 } from "recharts"
 import { useClienteContext, ClienteInfo } from "@/hooks/useClienteContext"
-import { createEmpresa, deleteEmpresa, getProjecaoByEmpresa, getCanvasByEmpresa, getOKRsByEmpresa, getReunioesByEmpresa } from "@/lib/api/data-service"
+import { createEmpresa, deleteEmpresa, getProjecaoByEmpresa, getCanvasByEmpresa, getOKRsByEmpresa, getReunioesByEmpresa, getTarefasByEmpresa, getAllTimesheet } from "@/lib/api/data-service"
 import { cn } from "@/lib/utils"
 import { gerarResultadoProfecia, calcularKPIs, formatarMoeda, MESES } from "@/lib/calculations/financeiro"
 import { gerarProjecaoCenarios, getFaturamentoCenario } from "@/lib/calculations/cenarios"
@@ -130,9 +130,7 @@ const d = (offsetDays: number) => {
 const fmt = (dt: Date) =>
   dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
 
-const mockTasks: Task[] = []
-
-const weeklyHours: { client: string; clientId: string; horas: number; fill: string }[] = []
+// Tasks and hours are loaded from Supabase dynamically in each view
 
 // ─── Phase Config ──────────────────────────────────────────────────────────────
 
@@ -943,11 +941,47 @@ function ClientFocusedView({ clientId }: { clientId: string }) {
 
   if (!client) return null
 
+  const [realTasks, setRealTasks] = useState<Task[]>([])
+
+  useEffect(() => {
+    async function loadTasks() {
+      try {
+        const data = await getTarefasByEmpresa(clientId)
+        if (data) {
+          const now = new Date()
+          const mapped: Task[] = data.map((t: { id: string; titulo: string; empresaId: string; prioridade?: string; prazo?: string; status?: string }) => {
+            const prazoDate = t.prazo ? new Date(t.prazo) : null
+            const prioMap: Record<string, Priority> = { URGENTE: "Alta", ALTA: "Alta", MEDIA: "Media", BAIXA: "Baixa" }
+            let taskStatus: TaskStatus = "Proxima Semana"
+            if (prazoDate) {
+              const diff = Math.floor((prazoDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+              if (diff < 0) taskStatus = "Atrasada"
+              else if (diff === 0) taskStatus = "Hoje"
+              else if (diff <= 7) taskStatus = "Esta Semana"
+            }
+            if (t.status === "CONCLUIDA") taskStatus = "Proxima Semana"
+            return {
+              id: t.id,
+              name: t.titulo,
+              client: client?.name ?? "",
+              clientId: t.empresaId,
+              priority: prioMap[t.prioridade ?? "MEDIA"] ?? "Media",
+              deadline: prazoDate ? fmt(prazoDate) : "-",
+              deadlineDate: prazoDate ?? now,
+              status: taskStatus,
+            }
+          }).filter((t: Task) => t.status !== "Proxima Semana")
+          setRealTasks(mapped)
+        }
+      } catch { /* ignore */ }
+    }
+    loadTasks()
+  }, [clientId, client?.name])
+
   const cfg = phaseConfig[client.phase]
-  const clientTasks = mockTasks.filter((t) => t.clientId === clientId)
-  const clientHours = weeklyHours.find((h) => h.clientId === clientId)
+  const clientTasks = realTasks
   const overdueTasks = clientTasks.filter((t) => t.status === "Atrasada").length
-  const horasWeek = clientHours?.horas ?? 0
+  const horasWeek = 0
 
   const tabs: { key: FocusTab; label: string; icon: React.ElementType }[] = [
     { key: "visao-geral", label: "Visao Geral",  icon: LayoutGrid },
@@ -1072,26 +1106,7 @@ function ClientFocusedView({ clientId }: { clientId: string }) {
             </CardContent>
           </Card>
 
-          {clientHours && (
-            <Card className="rounded-xl">
-              <CardHeader className="px-5 pt-5 pb-3 flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-sm font-semibold text-foreground">Horas Registradas — Esta Semana</CardTitle>
-                <span className="text-xs font-semibold text-primary">{horasWeek.toFixed(1)}h</span>
-              </CardHeader>
-              <CardContent className="px-5 pb-5 pt-0">
-                <ResponsiveContainer width="100%" height={80}>
-                  <BarChart data={[clientHours]} layout="vertical" margin={{ top: 0, right: 16, bottom: 0, left: 0 }} barSize={20}>
-                    <XAxis type="number" hide />
-                    <YAxis type="category" dataKey="client" width={120} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
-                    <Tooltip cursor={{ fill: "transparent" }} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "12px", color: "var(--foreground)" }} formatter={(v) => [`${v}h`, "Horas"]} />
-                    <Bar dataKey="horas" radius={[0, 6, 6, 0]}>
-                      <Cell fill={clientHours.fill} />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          )}
+          {/* Hours widget removed - use Timesheet page for detailed tracking */}
         </div>
       )}
 
@@ -1234,19 +1249,60 @@ function ConsolidatedView() {
   const [taskFilter, setTaskFilter] = useState<FilterKey>("Todas")
   const [timerRunning] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [allTasks, setAllTasks] = useState<Task[]>([])
+
+  // Load tasks from all clients
+  useEffect(() => {
+    async function loadAllTasks() {
+      if (clientes.length === 0) return
+      try {
+        const now = new Date()
+        const tasks: Task[] = []
+        for (const c of clientes.slice(0, 10)) {
+          const data = await getTarefasByEmpresa(c.id)
+          if (data) {
+            for (const t of data) {
+              const prazoDate = t.prazo ? new Date(t.prazo) : null
+              const prioMap: Record<string, Priority> = { URGENTE: "Alta", ALTA: "Alta", MEDIA: "Media", BAIXA: "Baixa" }
+              let taskStatus: TaskStatus = "Proxima Semana"
+              if (prazoDate) {
+                const diff = Math.floor((prazoDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                if (diff < 0) taskStatus = "Atrasada"
+                else if (diff === 0) taskStatus = "Hoje"
+                else if (diff <= 7) taskStatus = "Esta Semana"
+              }
+              if (t.status === "CONCLUIDA") continue
+              tasks.push({
+                id: t.id,
+                name: t.titulo,
+                client: c.nome,
+                clientId: c.id,
+                priority: prioMap[t.prioridade ?? "MEDIA"] ?? "Media",
+                deadline: prazoDate ? fmt(prazoDate) : "-",
+                deadlineDate: prazoDate ?? now,
+                status: taskStatus,
+              })
+            }
+          }
+        }
+        setAllTasks(tasks)
+      } catch { /* ignore */ }
+    }
+    loadAllTasks()
+  }, [clientes])
 
   const pipelineClients = clientes.map(mapClienteToClient)
   const totalClients    = pipelineClients.length
-  const totalPending    = mockTasks.filter((t) => t.status !== "Proxima Semana").length
-  const totalHorasWeek  = weeklyHours.reduce((s, h) => s + h.horas, 0)
+  const totalPending    = allTasks.length
+  const totalHorasWeek  = 0
   const reunioesWeek    = 0
 
   const filteredTasks =
     taskFilter === "Todas"
-      ? mockTasks
+      ? allTasks
       : taskFilter === "Atrasadas"
-      ? mockTasks.filter((t) => t.status === "Atrasada")
-      : mockTasks.filter((t) => t.status === taskFilter)
+      ? allTasks.filter((t) => t.status === "Atrasada")
+      : allTasks.filter((t) => t.status === taskFilter)
 
   async function handleDelete(id: string) {
     try {
@@ -1516,53 +1572,7 @@ function ConsolidatedView() {
           </CardContent>
         </Card>
 
-        {/* Resumo Semanal */}
-        <Card className="rounded-xl">
-          <CardHeader className="px-5 pt-5 pb-3 flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-semibold text-foreground">
-              Horas por Cliente — Esta Semana
-            </CardTitle>
-            <span className="text-xs font-semibold text-primary">
-              {totalHorasWeek.toFixed(1)}h total
-            </span>
-          </CardHeader>
-          <CardContent className="px-5 pb-5 pt-0">
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart
-                data={weeklyHours}
-                layout="vertical"
-                margin={{ top: 0, right: 16, bottom: 0, left: 0 }}
-                barSize={12}
-              >
-                <XAxis type="number" hide />
-                <YAxis
-                  type="category"
-                  dataKey="client"
-                  width={110}
-                  tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip
-                  cursor={{ fill: "transparent" }}
-                  contentStyle={{
-                    background: "var(--card)",
-                    border: "1px solid var(--border)",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                    color: "var(--foreground)",
-                  }}
-                  formatter={(v) => [`${v}h`, "Horas"]}
-                />
-                <Bar dataKey="horas" radius={[0, 6, 6, 0]}>
-                  {weeklyHours.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {/* Resumo Semanal - use Timesheet page for details */}
       </div>
     </div>
   )
