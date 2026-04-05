@@ -1,39 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 
-export const maxDuration = 120 // seconds
+export const maxDuration = 60 // seconds
 export const dynamic = 'force-dynamic'
 
-const SYSTEM_PROMPT = `Você é um assistente especializado em gestão de projetos e acompanhamento de reuniões de consultoria empresarial.
+const SYSTEM_PROMPT = `Voce e um assistente especializado em gestao de projetos e acompanhamento de reunioes de consultoria empresarial.
 
-Sua tarefa é analisar transcrições de reuniões e gerar uma ata estruturada completa. Você deve retornar um JSON com a seguinte estrutura:
+Sua tarefa e analisar transcricoes de reunioes e gerar uma ata estruturada completa. Voce deve retornar um JSON com a seguinte estrutura:
 
 {
-  "resumo": "Resumo executivo da reunião em 2-4 frases, incluindo participantes, objetivo e contexto",
+  "resumo": "Resumo executivo da reuniao em 2-4 frases, incluindo participantes, objetivo e contexto",
   "pauta": ["Item 1 discutido", "Item 2 discutido", ...],
-  "decisoes": ["Decisão 1 tomada na reunião", "Decisão 2", ...],
+  "decisoes": ["Decisao 1 tomada na reuniao", "Decisao 2", ...],
   "tarefas": [
     {
-      "titulo": "Descrição concisa da tarefa (máx 100 caracteres)",
-      "descricao": "Detalhamento completo do que precisa ser feito, incluindo contexto da reunião",
-      "responsavel": "Nome da pessoa responsável (se mencionado, senão null)",
-      "prazo": "YYYY-MM-DD (se mencionado ou inferível, senão null)",
+      "titulo": "Descricao concisa da tarefa (max 100 caracteres)",
+      "descricao": "Detalhamento completo do que precisa ser feito, incluindo contexto da reuniao",
+      "responsavel": "Nome da pessoa responsavel (se mencionado, senao null)",
+      "prazo": "YYYY-MM-DD (se mencionado ou inferivel, senao null)",
       "prioridade": "BAIXA | MEDIA | ALTA | URGENTE",
       "categoria": "Nome do grupo/tema desta tarefa (ex: Onboarding, Infraestrutura, Comercial)"
     }
   ],
-  "proximosPassos": ["Próximo passo 1", "Próximo passo 2", ...]
+  "proximosPassos": ["Proximo passo 1", "Proximo passo 2", ...]
 }
 
 Regras:
-1. Extraia TODAS as atividades, tarefas e compromissos mencionados — não perca nenhum
-2. Para prazos relativos como "amanhã", "sexta-feira", "semana que vem", converta para data absoluta YYYY-MM-DD usando a data de hoje como referência
-3. Infira a prioridade do contexto: urgente/hoje/ASAP = URGENTE, importante/crítico = ALTA, normal = MEDIA, pode esperar = BAIXA
-4. Agrupe tarefas por categoria/tema quando possível
-5. Inclua contexto relevante na descrição de cada tarefa
-6. Se alguém "ficou de fazer" algo, isso é uma tarefa
-7. Se houve uma decisão que gera uma ação, extraia como tarefa
-8. Responda SOMENTE com JSON válido, sem texto adicional fora do JSON`
+1. Extraia TODAS as atividades, tarefas e compromissos mencionados - nao perca nenhum
+2. Para prazos relativos como "amanha", "sexta-feira", "semana que vem", converta para data absoluta YYYY-MM-DD usando a data de hoje como referencia
+3. Infira a prioridade do contexto: urgente/hoje/ASAP = URGENTE, importante/critico = ALTA, normal = MEDIA, pode esperar = BAIXA
+4. Agrupe tarefas por categoria/tema quando possivel
+5. Inclua contexto relevante na descricao de cada tarefa
+6. Se alguem "ficou de fazer" algo, isso e uma tarefa
+7. Se houve uma decisao que gera uma acao, extraia como tarefa
+8. Responda SOMENTE com JSON valido, sem texto adicional fora do JSON`
 
 // ── Extract text from file ───────────────────────────────────────────────
 
@@ -50,9 +50,10 @@ async function extractTextFromFile(
 
   if (ext === 'pdf') {
     try {
-      const pdfParse = (await import('pdf-parse')).default
-      const result = await pdfParse(buffer)
-      return result.text
+      const { extractText } = await import('unpdf')
+      const uint8 = new Uint8Array(buffer)
+      const { text } = await extractText(uint8)
+      return text
     } catch (err) {
       console.error('Erro ao parsear PDF:', err)
       return ''
@@ -103,6 +104,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Transcricao muito curta.' }, { status: 400 })
     }
 
+    // Truncate if too long (avoid token limits)
+    const MAX_CHARS = 80000
+    if (transcricao.length > MAX_CHARS) {
+      transcricao = transcricao.slice(0, MAX_CHARS)
+    }
+
     // Get today's date for relative date conversion
     const hoje = new Date().toISOString().split('T')[0]
     const diaSemana = new Date().toLocaleDateString('pt-BR', { weekday: 'long' })
@@ -112,21 +119,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(fallbackParse(transcricao))
     }
 
-    // Kimi K2 Free via OpenRouter (custo $0)
+    // Qwen 3.6 Plus Free via OpenRouter (custo $0, rapido, suporta JSON)
     const openrouter = new OpenAI({
       apiKey,
       baseURL: 'https://openrouter.ai/api/v1',
     })
 
     const completion = await openrouter.chat.completions.create({
-      model: 'moonshotai/kimi-k2:free',
+      model: 'qwen/qwen3.6-plus:free',
       temperature: 0.3,
       max_tokens: 8192,
+      response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         {
           role: 'user',
-          content: `Data de hoje: ${hoje} (${diaSemana})\n\nAnalise a seguinte transcrição de reunião, gere a ata completa e extraia todas as tarefas e atividades:\n\n${transcricao}`,
+          content: `Data de hoje: ${hoje} (${diaSemana})\n\nAnalise a seguinte transcricao de reuniao, gere a ata completa e extraia todas as tarefas e atividades:\n\n${transcricao}`,
         },
       ],
     })
@@ -141,6 +149,9 @@ export async function POST(request: NextRequest) {
     const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/)
     if (jsonMatch) jsonText = jsonMatch[1].trim()
 
+    // Remove /no_think tags if present (Qwen thinking mode)
+    jsonText = jsonText.replace(/<\/?think>/g, '').trim()
+
     const parsed = JSON.parse(jsonText)
 
     // Ensure required fields exist
@@ -152,8 +163,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(parsed)
   } catch (err) {
-    console.error('Erro na análise de reunião:', err)
-    return NextResponse.json({ error: 'Erro ao processar transcricao. Verifique a OPENROUTER_API_KEY.' }, { status: 500 })
+    console.error('Erro na analise de reuniao:', err)
+    const message = err instanceof Error ? err.message : 'Erro desconhecido'
+    return NextResponse.json({ error: `Erro ao processar transcricao: ${message}` }, { status: 500 })
   }
 }
 
