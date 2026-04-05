@@ -530,6 +530,18 @@ export async function getRespostasByEntrevista(entrevistaId: string) {
   return data
 }
 
+export async function createResposta(params: {
+  entrevistaId: string; respondente: string; cargo?: string; area?: string; respostas: Record<string, string | number>
+}) {
+  const supabase = createClient()
+  const { data, error } = await supabase.from('RespostaEntrevista').insert({
+    entrevistaId: params.entrevistaId, respondente: params.respondente,
+    cargo: params.cargo ?? null, area: params.area ?? null, respostas: params.respostas,
+  }).select().single()
+  if (error) throw error
+  return data
+}
+
 // ── Memoria do Cliente ───────────────────────────────────────────────────────
 
 export async function getMemoriaByEmpresa(empresaId: string) {

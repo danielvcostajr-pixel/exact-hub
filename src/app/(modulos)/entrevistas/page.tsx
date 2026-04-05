@@ -1,17 +1,21 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, ClipboardList, MessageSquare, BarChart3, Eye, Send, CheckCircle, FileText, ArrowLeft } from 'lucide-react'
+import { Plus, ClipboardList, MessageSquare, BarChart3, Eye, Send, CheckCircle, FileText, ArrowLeft, UserPlus, X, Loader2 } from 'lucide-react'
 import { useClienteContext } from '@/hooks/useClienteContext'
-import { getEntrevistasByEmpresa } from '@/lib/api/data-service'
+import { getEntrevistasByEmpresa, getRespostasByEntrevista, createResposta } from '@/lib/api/data-service'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { FormQuestionario } from '@/components/entrevistas/FormQuestionario'
 import { RespostaCard } from '@/components/entrevistas/RespostaCard'
 import { AnalisePareto } from '@/components/entrevistas/AnalisePareto'
-import { Entrevista, RespostaEntrevista, StatusEntrevista } from '@/types'
+import { Entrevista, RespostaEntrevista, StatusEntrevista, Pergunta } from '@/types'
 
 const STATUS_CONFIG: Record<StatusEntrevista, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
   RASCUNHO: { label: 'Rascunho', color: '#B0B0B0', bg: '#1A1C1E', icon: <FileText size={10} /> },
@@ -20,29 +24,293 @@ const STATUS_CONFIG: Record<StatusEntrevista, { label: string; color: string; bg
   ANALISADA: { label: 'Analisada', color: '#F17522', bg: '#F17522' + '22', icon: <BarChart3 size={10} /> },
 }
 
+// ── Response Collection Dialog ────────────────────────────────────────────────
+
+function FormResponder({
+  open,
+  onClose,
+  entrevista,
+  onSaved,
+}: {
+  open: boolean
+  onClose: () => void
+  entrevista: Entrevista | null
+  onSaved: (resp: RespostaEntrevista) => void
+}) {
+  const [respondente, setRespondente] = useState('')
+  const [cargo, setCargo] = useState('')
+  const [area, setArea] = useState('')
+  const [answers, setAnswers] = useState<Record<string, string | number>>({})
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Reset form when dialog opens with a new entrevista
+  useEffect(() => {
+    if (open) {
+      setRespondente('')
+      setCargo('')
+      setArea('')
+      setAnswers({})
+      setError(null)
+    }
+  }, [open])
+
+  if (!entrevista) return null
+
+  const perguntas: Pergunta[] = entrevista.perguntas ?? []
+
+  function updateAnswer(perguntaId: string, value: string | number) {
+    setAnswers((prev) => ({ ...prev, [perguntaId]: value }))
+  }
+
+  async function handleSubmit() {
+    if (!respondente.trim()) {
+      setError('Informe o nome do respondente.')
+      return
+    }
+
+    // Check all questions answered
+    const unanswered = perguntas.filter((p) => {
+      const val = answers[p.id]
+      return val === undefined || val === ''
+    })
+    if (unanswered.length > 0) {
+      setError(`Responda todas as perguntas. Faltam ${unanswered.length}.`)
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    try {
+      const data = await createResposta({
+        entrevistaId: entrevista.id!,
+        respondente: respondente.trim(),
+        cargo: cargo.trim() || undefined,
+        area: area.trim() || undefined,
+        respostas: answers,
+      })
+      onSaved(data as unknown as RespostaEntrevista)
+      onClose()
+    } catch (err) {
+      setError('Erro ao salvar resposta. Tente novamente.')
+      console.error(err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto bg-card border-border">
+        <DialogHeader>
+          <DialogTitle className="text-foreground">Coletar Resposta</DialogTitle>
+          <DialogDescription className="text-muted-foreground">
+            {entrevista.titulo} - {perguntas.length} perguntas
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-5 py-2">
+          {/* Respondent Info */}
+          <div className="rounded-lg border border-border bg-background p-4 space-y-3">
+            <h4 className="text-sm font-semibold text-foreground">Dados do Respondente</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Nome *</Label>
+                <Input
+                  value={respondente}
+                  onChange={(e) => setRespondente(e.target.value)}
+                  placeholder="Nome completo"
+                  className="bg-card border-border"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Cargo</Label>
+                <Input
+                  value={cargo}
+                  onChange={(e) => setCargo(e.target.value)}
+                  placeholder="Ex: Gerente"
+                  className="bg-card border-border"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Area</Label>
+                <Input
+                  value={area}
+                  onChange={(e) => setArea(e.target.value)}
+                  placeholder="Ex: Comercial"
+                  className="bg-card border-border"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Questions */}
+          <div className="space-y-4">
+            {perguntas.map((pergunta, idx) => (
+              <div key={pergunta.id} className="rounded-lg border border-border bg-background p-4 space-y-2">
+                <div className="flex items-start gap-2">
+                  <span className="text-xs font-bold text-primary mt-0.5">{idx + 1}.</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-foreground">{pergunta.texto}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="outline" className="text-[10px] border-border text-muted-foreground">
+                        {pergunta.categoria}
+                      </Badge>
+                      <Badge variant="outline" className="text-[10px] border-border text-muted-foreground">
+                        {pergunta.tipo === 'aberta' ? 'Aberta' : pergunta.tipo === 'escala' ? 'Escala 1-10' : 'Multipla Escolha'}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pl-5">
+                  {pergunta.tipo === 'aberta' && (
+                    <Textarea
+                      value={(answers[pergunta.id] as string) ?? ''}
+                      onChange={(e) => updateAnswer(pergunta.id, e.target.value)}
+                      placeholder="Digite sua resposta..."
+                      className="bg-card border-border min-h-[80px] text-sm"
+                    />
+                  )}
+
+                  {pergunta.tipo === 'escala' && (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => updateAnswer(pergunta.id, n)}
+                          className={`w-9 h-9 rounded-lg text-sm font-medium transition-all ${
+                            answers[pergunta.id] === n
+                              ? 'bg-primary text-white shadow-sm'
+                              : 'bg-card border border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                          }`}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                      <span className="text-[10px] text-muted-foreground/50 ml-2">
+                        1 = Muito ruim, 10 = Excelente
+                      </span>
+                    </div>
+                  )}
+
+                  {pergunta.tipo === 'multipla_escolha' && pergunta.opcoes && (
+                    <div className="space-y-1.5">
+                      {pergunta.opcoes.map((opcao) => (
+                        <label
+                          key={opcao}
+                          className="flex items-center gap-2.5 cursor-pointer group rounded-lg border border-border bg-card px-3 py-2 hover:border-primary/40 transition-colors"
+                        >
+                          <input
+                            type="radio"
+                            name={`pergunta-${pergunta.id}`}
+                            checked={answers[pergunta.id] === opcao}
+                            onChange={() => updateAnswer(pergunta.id, opcao)}
+                            className="accent-primary"
+                          />
+                          <span className="text-sm text-foreground group-hover:text-primary transition-colors">{opcao}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="rounded-lg px-4 py-3 text-sm bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-400">
+            {error}
+          </div>
+        )}
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button variant="outline" onClick={onClose} className="border-border text-muted-foreground">
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="bg-primary hover:bg-primary/90 text-white gap-2"
+          >
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+            {saving ? 'Salvando...' : 'Salvar Resposta'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
+
 export default function EntrevistasPage() {
   const { clienteAtivo, isFiltered } = useClienteContext()
   const [entrevistas, setEntrevistas] = useState<Entrevista[]>([])
-  const [respostas] = useState<RespostaEntrevista[]>([])
+  const [respostas, setRespostas] = useState<RespostaEntrevista[]>([])
+  const [respostasCounts, setRespostasCounts] = useState<Record<string, number>>({})
   const [formOpen, setFormOpen] = useState(false)
+  const [responderOpen, setResponderOpen] = useState(false)
+  const [entrevistaParaResponder, setEntrevistaParaResponder] = useState<Entrevista | null>(null)
   const [activeTab, setActiveTab] = useState('questionarios')
   const [analiseAtiva, setAnaliseAtiva] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (clienteAtivo) {
-      setLoading(true)
-      getEntrevistasByEmpresa(clienteAtivo.id)
-        .then((data) => {
-          setEntrevistas(data as unknown as Entrevista[])
+  // Load entrevistas and their response counts
+  const loadData = useCallback(async () => {
+    if (!clienteAtivo) return
+    setLoading(true)
+    try {
+      const data = await getEntrevistasByEmpresa(clienteAtivo.id)
+      const ents = data as unknown as Entrevista[]
+      setEntrevistas(ents)
+
+      // Load response counts for each entrevista
+      const counts: Record<string, number> = {}
+      const allRespostas: RespostaEntrevista[] = []
+      await Promise.all(
+        ents.map(async (ent) => {
+          if (!ent.id) return
+          try {
+            const resps = await getRespostasByEntrevista(ent.id)
+            counts[ent.id] = resps.length
+            allRespostas.push(...(resps as unknown as RespostaEntrevista[]))
+          } catch {
+            counts[ent.id!] = 0
+          }
         })
-        .catch(() => setEntrevistas([]))
-        .finally(() => setLoading(false))
+      )
+      setRespostasCounts(counts)
+      setRespostas(allRespostas)
+    } catch {
+      setEntrevistas([])
+    } finally {
+      setLoading(false)
     }
   }, [clienteAtivo])
 
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
   function handleSaveEntrevista(entrevista: Entrevista) {
     setEntrevistas((prev) => [entrevista, ...prev])
+  }
+
+  function handleOpenResponder(entrevista: Entrevista) {
+    setEntrevistaParaResponder(entrevista)
+    setResponderOpen(true)
+  }
+
+  function handleRespostaSaved(resp: RespostaEntrevista) {
+    setRespostas((prev) => [resp, ...prev])
+    setRespostasCounts((prev) => ({
+      ...prev,
+      [resp.entrevistaId]: (prev[resp.entrevistaId] ?? 0) + 1,
+    }))
   }
 
   function handleVerAnalise(entrevistaId: string) {
@@ -50,6 +318,7 @@ export default function EntrevistasPage() {
     setActiveTab('analise')
   }
 
+  const totalRespostas = Object.values(respostasCounts).reduce((a, b) => a + b, 0)
   const entrevistaComAnalise = entrevistas.find((e) => e.id === analiseAtiva)
 
   if (!isFiltered) {
@@ -120,7 +389,7 @@ export default function EntrevistasPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Entrevistas com Equipe</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {entrevistas.length} questionarios criados • {respostas.length} respostas coletadas
+            {entrevistas.length} questionarios criados &bull; {totalRespostas} respostas coletadas
           </p>
         </div>
         <Button
@@ -164,7 +433,7 @@ export default function EntrevistasPage() {
           <div className="flex flex-col gap-3">
             {entrevistas.map((ent) => {
               const statusCfg = STATUS_CONFIG[ent.status]
-              const respostasCount = respostas.filter((r) => r.entrevistaId === ent.id).length
+              const respostasCount = respostasCounts[ent.id!] ?? 0
               return (
                 <div
                   key={ent.id}
@@ -193,13 +462,24 @@ export default function EntrevistasPage() {
                       )}
                       <div className="flex items-center gap-3 mt-1">
                         <span className="text-[11px] text-muted-foreground/50">{ent.perguntas.length} perguntas</span>
-                        <span className="text-[11px] text-muted-foreground/50">•</span>
-                        <span className="text-[11px] text-muted-foreground/50">{respostasCount} respostas</span>
+                        <span className="text-[11px] text-muted-foreground/50">&bull;</span>
+                        <span className="text-[11px] text-muted-foreground/50">
+                          {respostasCount} {respostasCount === 1 ? 'resposta' : 'respostas'}
+                        </span>
                       </div>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleOpenResponder(ent)}
+                      className="border-green-500/40 text-green-600 dark:text-green-400 hover:bg-green-500/10 gap-1.5 text-xs"
+                    >
+                      <UserPlus size={12} />
+                      Coletar Resposta
+                    </Button>
                     {ent.analise && (
                       <Button
                         size="sm"
@@ -242,6 +522,15 @@ export default function EntrevistasPage() {
                     >
                       {respostasEnt.length} respostas
                     </Badge>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleOpenResponder(ent)}
+                      className="text-xs text-primary hover:text-primary/80 gap-1 ml-auto"
+                    >
+                      <UserPlus size={12} />
+                      Nova Resposta
+                    </Button>
                   </div>
                   <div className="flex flex-col gap-3">
                     {respostasEnt.map((resp) => (
@@ -263,6 +552,9 @@ export default function EntrevistasPage() {
             >
               <MessageSquare size={24} className="text-muted-foreground/30 mx-auto mb-2" />
               <p className="text-sm text-muted-foreground/50">Nenhuma resposta coletada ainda</p>
+              <p className="text-xs text-muted-foreground/30 mt-1">
+                Use o botao &quot;Coletar Resposta&quot; em um questionario para comecar.
+              </p>
             </div>
           )}
         </TabsContent>
@@ -305,12 +597,23 @@ export default function EntrevistasPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Form Dialog */}
+      {/* Form Dialog - Create Questionario */}
       <FormQuestionario
         open={formOpen}
         onClose={() => setFormOpen(false)}
         onSave={handleSaveEntrevista}
         empresaId={clienteAtivo?.id ?? ''}
+      />
+
+      {/* Form Dialog - Collect Response */}
+      <FormResponder
+        open={responderOpen}
+        onClose={() => {
+          setResponderOpen(false)
+          setEntrevistaParaResponder(null)
+        }}
+        entrevista={entrevistaParaResponder}
+        onSaved={handleRespostaSaved}
       />
     </div>
   )

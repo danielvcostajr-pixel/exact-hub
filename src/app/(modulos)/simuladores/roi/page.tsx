@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -16,8 +16,11 @@ import {
   XCircle,
   Plus,
   Trash2,
+  Loader2,
+  CheckCircle,
 } from 'lucide-react'
 import { useClienteContext } from '@/hooks/useClienteContext'
+import { saveSimulador, getSimuladorByEmpresa, getCurrentUserId } from '@/lib/api/data-service'
 import {
   Area,
   XAxis,
@@ -211,6 +214,51 @@ export default function ROIPage() {
   const [resultado, setResultado] = useState<KPIResult | null>(null)
   const [calculado, setCalculado] = useState(false)
 
+  // Save state
+  const [saving, setSaving] = useState(false)
+  const [savedAt, setSavedAt] = useState<string | null>(null)
+
+  // ── Load saved data on mount ────────────────────────────────────────────
+  useEffect(() => {
+    if (!clienteAtivo) return
+    async function loadSaved() {
+      try {
+        const saved = await getSimuladorByEmpresa(clienteAtivo!.id, 'roi')
+        if (saved?.inputs) {
+          const inputs = saved.inputs as Partial<InputData>
+          setInput((prev) => ({ ...prev, ...inputs }))
+          if (saved.updatedAt) {
+            setSavedAt(new Date(saved.updatedAt).toLocaleString('pt-BR'))
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    loadSaved()
+  }, [clienteAtivo])
+
+  // ── Save handler ────────────────────────────────────────────────────────
+  const handleSave = useCallback(async () => {
+    if (!clienteAtivo) return
+    setSaving(true)
+    try {
+      const userId = await getCurrentUserId()
+      const res = calculado ? resultado : calcularKPIs(input)
+      await saveSimulador({
+        empresaId: clienteAtivo.id,
+        tipo: 'roi',
+        nome: 'ROI de Investimentos',
+        inputs: input,
+        outputs: { resultado: res },
+        criadoPorId: userId || 'system',
+      })
+      setSavedAt(new Date().toLocaleString('pt-BR'))
+    } catch (err) {
+      console.error('Erro ao salvar simulador:', err)
+    } finally {
+      setSaving(false)
+    }
+  }, [clienteAtivo, input, resultado, calculado])
+
   const handleCalcular = useCallback(() => {
     const res = calcularKPIs(input)
     setResultado(res)
@@ -342,9 +390,13 @@ export default function ROIPage() {
             <History size={14} />
             Historico
           </button>
-          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors">
-            <Save size={14} />
-            Salvar
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors disabled:opacity-50"
+          >
+            {saving ? <Loader2 size={14} className="animate-spin" /> : savedAt ? <CheckCircle size={14} className="text-green-500" /> : <Save size={14} />}
+            {saving ? 'Salvando...' : savedAt ? `Salvo ${savedAt}` : 'Salvar'}
           </button>
         </div>
       </div>

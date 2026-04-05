@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -10,8 +10,11 @@ import {
   Percent,
   Target,
   PackageCheck,
+  Loader2,
+  CheckCircle,
 } from 'lucide-react'
 import { useClienteContext } from '@/hooks/useClienteContext'
+import { saveSimulador, getSimuladorByEmpresa, getCurrentUserId } from '@/lib/api/data-service'
 import {
   Card,
   CardContent,
@@ -113,8 +116,71 @@ export default function PontoEquilibrioPage() {
   const [custoVariavelU, setCustoVariavelU] = useState<string>('')
   const [resultadoUni, setResultadoUni] = useState<ResultadoUnidades | null>(null)
 
-  // ── saved alert ──────────────────────────────────────────────────────────
-  const [saved, setSaved] = useState(false)
+  // ── save state ──────────────────────────────────────────────────────────
+  const [saving, setSaving] = useState(false)
+  const [savedAt, setSavedAt] = useState<string | null>(null)
+
+  // ── Load saved data on mount ────────────────────────────────────────────
+  useEffect(() => {
+    if (!clienteAtivo) return
+    async function loadSaved() {
+      try {
+        const saved = await getSimuladorByEmpresa(clienteAtivo!.id, 'ponto-equilibrio')
+        if (saved?.inputs) {
+          const inputs = saved.inputs as {
+            custosFixos?: string
+            custosVariaveis?: string
+            faturamentoAtual?: string
+            importarProjecao?: boolean
+            custosFixosU?: string
+            precoUnitario?: string
+            custoVariavelU?: string
+          }
+          if (inputs.custosFixos !== undefined) setCustosFixos(inputs.custosFixos)
+          if (inputs.custosVariaveis !== undefined) setCustosVariaveis(inputs.custosVariaveis)
+          if (inputs.faturamentoAtual !== undefined) setFaturamentoAtual(inputs.faturamentoAtual)
+          if (inputs.importarProjecao !== undefined) setImportarProjecao(inputs.importarProjecao)
+          if (inputs.custosFixosU !== undefined) setCustosFixosU(inputs.custosFixosU)
+          if (inputs.precoUnitario !== undefined) setPrecoUnitario(inputs.precoUnitario)
+          if (inputs.custoVariavelU !== undefined) setCustoVariavelU(inputs.custoVariavelU)
+          if (saved.updatedAt) {
+            setSavedAt(new Date(saved.updatedAt).toLocaleString('pt-BR'))
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    loadSaved()
+  }, [clienteAtivo])
+
+  // ── Save handler ────────────────────────────────────────────────────────
+  const handleSave = useCallback(async () => {
+    if (!clienteAtivo) return
+    setSaving(true)
+    try {
+      const userId = await getCurrentUserId()
+      await saveSimulador({
+        empresaId: clienteAtivo.id,
+        tipo: 'ponto-equilibrio',
+        nome: 'Ponto de Equilíbrio',
+        inputs: {
+          custosFixos,
+          custosVariaveis,
+          faturamentoAtual,
+          importarProjecao,
+          custosFixosU,
+          precoUnitario,
+          custoVariavelU,
+        },
+        outputs: { resultadoFin, resultadoUni },
+        criadoPorId: userId || 'system',
+      })
+      setSavedAt(new Date().toLocaleString('pt-BR'))
+    } catch (err) {
+      console.error('Erro ao salvar simulador:', err)
+    } finally {
+      setSaving(false)
+    }
+  }, [clienteAtivo, custosFixos, custosVariaveis, faturamentoAtual, importarProjecao, custosFixosU, precoUnitario, custoVariavelU, resultadoFin, resultadoUni])
 
   // ─────────────────────────────────────────────────────────────────────────
   // Handlers — Financeiro
@@ -180,15 +246,6 @@ export default function PontoEquilibrioPage() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Save mock
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const handleSave = () => {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
   // Render
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -226,9 +283,6 @@ export default function PontoEquilibrioPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {saved && (
-              <span className="text-sm font-medium text-green-500">Simulação salva!</span>
-            )}
             <Button variant="outline" size="sm" className="gap-2" disabled>
               <History className="h-4 w-4" />
               Histórico
@@ -237,9 +291,10 @@ export default function PontoEquilibrioPage() {
               size="sm"
               className="gap-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700"
               onClick={handleSave}
+              disabled={saving}
             >
-              <Save className="h-4 w-4" />
-              Salvar Simulação
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : savedAt ? <CheckCircle className="h-4 w-4 text-white" /> : <Save className="h-4 w-4" />}
+              {saving ? 'Salvando...' : savedAt ? `Salvo ${savedAt}` : 'Salvar Simulação'}
             </Button>
           </div>
         </div>

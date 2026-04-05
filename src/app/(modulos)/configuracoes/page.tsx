@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import {
   Settings,
@@ -14,6 +14,7 @@ import {
   Zap,
   RefreshCw,
   ArrowLeft,
+  Save,
 } from "lucide-react"
 import { useClienteContext } from "@/hooks/useClienteContext"
 import { Button } from "@/components/ui/button"
@@ -23,6 +24,8 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { DashboardLayout } from "@/components/layout/DashboardLayout"
 import { cn } from "@/lib/utils"
+
+const STORAGE_KEY = "exacthub_settings"
 
 // --- ClickUp State ---
 interface ClickUpConfig {
@@ -40,6 +43,39 @@ interface GCalConfig {
   status: "conectado" | "desconectado"
   timezone: string
   autoSync: boolean
+}
+
+interface SavedSettings {
+  clickup: Omit<ClickUpConfig, "status"> & { status?: string }
+  gcal: GCalConfig
+}
+
+function loadSettings(): SavedSettings | null {
+  if (typeof window === "undefined") return null
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    return JSON.parse(raw) as SavedSettings
+  } catch {
+    return null
+  }
+}
+
+function saveSettings(clickup: ClickUpConfig, gcal: GCalConfig) {
+  if (typeof window === "undefined") return
+  const payload: SavedSettings = {
+    clickup: {
+      apiKey: clickup.apiKey,
+      workspaceId: clickup.workspaceId,
+      spaceId: clickup.spaceId,
+      autoCreate: clickup.autoCreate,
+      autoUpdate: clickup.autoUpdate,
+      autoImport: clickup.autoImport,
+      status: clickup.status,
+    },
+    gcal,
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
 }
 
 function StatusBadge({ status }: { status: "conectado" | "desconectado" | "testando" }) {
@@ -115,6 +151,7 @@ export default function ConfiguracoesPage() {
   })
   const [showApiKey, setShowApiKey] = useState(false)
   const [testResult, setTestResult] = useState<string | null>(null)
+  const [saveResult, setSaveResult] = useState<string | null>(null)
 
   // Google Calendar state
   const [gcal, setGcal] = useState<GCalConfig>({
@@ -123,6 +160,27 @@ export default function ConfiguracoesPage() {
     autoSync: false,
   })
 
+  // Load settings from localStorage on mount
+  useEffect(() => {
+    const saved = loadSettings()
+    if (saved) {
+      setClickup({
+        apiKey: saved.clickup.apiKey ?? "",
+        workspaceId: saved.clickup.workspaceId ?? "",
+        spaceId: saved.clickup.spaceId ?? "",
+        autoCreate: saved.clickup.autoCreate ?? false,
+        autoUpdate: saved.clickup.autoUpdate ?? false,
+        autoImport: saved.clickup.autoImport ?? false,
+        status: (saved.clickup.status as ClickUpConfig["status"]) ?? "desconectado",
+      })
+      setGcal({
+        status: saved.gcal.status ?? "desconectado",
+        timezone: saved.gcal.timezone ?? "America/Fortaleza",
+        autoSync: saved.gcal.autoSync ?? false,
+      })
+    }
+  }, [])
+
   const updateClickup = <K extends keyof ClickUpConfig>(key: K, value: ClickUpConfig[K]) => {
     setClickup((prev) => ({ ...prev, [key]: value }))
   }
@@ -130,18 +188,25 @@ export default function ConfiguracoesPage() {
   const handleTestarClickup = () => {
     if (!clickup.apiKey || !clickup.workspaceId) {
       setTestResult("Preencha a API Key e o Workspace ID antes de testar.")
+      setSaveResult(null)
       return
     }
     setClickup((prev) => ({ ...prev, status: "testando" }))
     setTestResult(null)
+    setSaveResult(null)
+    // Simulated connection test
     setTimeout(() => {
       setClickup((prev) => ({ ...prev, status: "conectado" }))
-      setTestResult("Conexao testada com sucesso! Workspace encontrado: Exact BI.")
+      setTestResult("Teste simulado com sucesso! Em producao, a conexao sera validada com a API do ClickUp.")
     }, 1800)
   }
 
   const handleSalvarClickup = () => {
-    setTestResult("Configuracoes salvas com sucesso!")
+    saveSettings(clickup, gcal)
+    setSaveResult("Configuracoes salvas com sucesso!")
+    setTestResult(null)
+    // Auto-clear success message after 3 seconds
+    setTimeout(() => setSaveResult(null), 3000)
   }
 
   const handleConectarGcal = () => {
@@ -149,6 +214,13 @@ export default function ConfiguracoesPage() {
     setTimeout(() => {
       setGcal((prev) => ({ ...prev, status: "conectado" }))
     }, 1000)
+  }
+
+  const handleSalvarGcal = () => {
+    saveSettings(clickup, gcal)
+    setSaveResult("Configuracoes do Google Calendar salvas com sucesso!")
+    // Auto-clear success message after 3 seconds
+    setTimeout(() => setSaveResult(null), 3000)
   }
 
   return (
@@ -172,6 +244,14 @@ export default function ConfiguracoesPage() {
             Gerencie as integracoes externas do Exact Hub com suas ferramentas de trabalho.
           </p>
         </div>
+
+        {/* Global save feedback */}
+        {saveResult && (
+          <div className="rounded-lg px-4 py-3 text-sm bg-green-500/10 border border-green-500/30 text-green-700 dark:text-green-400 flex items-center gap-2">
+            <CheckCircle2 className="size-4 shrink-0" />
+            {saveResult}
+          </div>
+        )}
 
         {/* ClickUp Card */}
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
@@ -271,8 +351,9 @@ export default function ConfiguracoesPage() {
               </Button>
               <Button
                 onClick={handleSalvarClickup}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
               >
+                <Save className="size-4" />
                 Salvar
               </Button>
             </div>
@@ -387,9 +468,10 @@ export default function ConfiguracoesPage() {
                 </div>
 
                 <Button
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                  onClick={() => {}}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
+                  onClick={handleSalvarGcal}
                 >
+                  <Save className="size-4" />
                   Salvar Configuracoes
                 </Button>
               </div>

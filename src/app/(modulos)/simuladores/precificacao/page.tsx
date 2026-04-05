@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -10,8 +10,11 @@ import {
   Percent,
   TrendingUp,
   Star,
+  Loader2,
+  CheckCircle,
 } from 'lucide-react'
 import { useClienteContext } from '@/hooks/useClienteContext'
+import { saveSimulador, getSimuladorByEmpresa, getCurrentUserId } from '@/lib/api/data-service'
 import {
   Card,
   CardContent,
@@ -106,8 +109,77 @@ export default function PrecificacaoPage() {
   const [resultado, setResultado] = useState<ResultadoPrecificacao | null>(null)
   const [linhasSensibilidade, setLinhasSensibilidade] = useState<LinhasSensibilidade[]>([])
 
-  // Saved alert
-  const [saved, setSaved] = useState(false)
+  // Save state
+  const [saving, setSaving] = useState(false)
+  const [savedAt, setSavedAt] = useState<string | null>(null)
+
+  // ── Load saved data on mount ────────────────────────────────────────────
+  useEffect(() => {
+    if (!clienteAtivo) return
+    async function loadSaved() {
+      try {
+        const saved = await getSimuladorByEmpresa(clienteAtivo!.id, 'precificacao')
+        if (saved?.inputs) {
+          const inputs = saved.inputs as {
+            custoProduto?: string
+            custosFixosRateados?: string
+            impostos?: string
+            comissoes?: string
+            metodo?: Metodo
+            markupPercentual?: string
+            margemDesejada?: string
+            sensibilidade?: boolean
+            volumeBase?: string
+          }
+          if (inputs.custoProduto !== undefined) setCustoProduto(inputs.custoProduto)
+          if (inputs.custosFixosRateados !== undefined) setCustosFixosRateados(inputs.custosFixosRateados)
+          if (inputs.impostos !== undefined) setImpostos(inputs.impostos)
+          if (inputs.comissoes !== undefined) setComissoes(inputs.comissoes)
+          if (inputs.metodo !== undefined) setMetodo(inputs.metodo)
+          if (inputs.markupPercentual !== undefined) setMarkupPercentual(inputs.markupPercentual)
+          if (inputs.margemDesejada !== undefined) setMargemDesejada(inputs.margemDesejada)
+          if (inputs.sensibilidade !== undefined) setSensibilidade(inputs.sensibilidade)
+          if (inputs.volumeBase !== undefined) setVolumeBase(inputs.volumeBase)
+          if (saved.updatedAt) {
+            setSavedAt(new Date(saved.updatedAt).toLocaleString('pt-BR'))
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    loadSaved()
+  }, [clienteAtivo])
+
+  // ── Save handler ────────────────────────────────────────────────────────
+  const handleSave = useCallback(async () => {
+    if (!clienteAtivo) return
+    setSaving(true)
+    try {
+      const userId = await getCurrentUserId()
+      await saveSimulador({
+        empresaId: clienteAtivo.id,
+        tipo: 'precificacao',
+        nome: 'Precificação',
+        inputs: {
+          custoProduto,
+          custosFixosRateados,
+          impostos,
+          comissoes,
+          metodo,
+          markupPercentual,
+          margemDesejada,
+          sensibilidade,
+          volumeBase,
+        },
+        outputs: { resultado, linhasSensibilidade },
+        criadoPorId: userId || 'system',
+      })
+      setSavedAt(new Date().toLocaleString('pt-BR'))
+    } catch (err) {
+      console.error('Erro ao salvar simulador:', err)
+    } finally {
+      setSaving(false)
+    }
+  }, [clienteAtivo, custoProduto, custosFixosRateados, impostos, comissoes, metodo, markupPercentual, margemDesejada, sensibilidade, volumeBase, resultado, linhasSensibilidade])
 
   // ─────────────────────────────────────────────────────────────────────────
   // Calculation
@@ -166,11 +238,6 @@ export default function PrecificacaoPage() {
     }
   }
 
-  const handleSave = () => {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
-  }
-
   // ─────────────────────────────────────────────────────────────────────────
   // Render
   // ─────────────────────────────────────────────────────────────────────────
@@ -209,9 +276,6 @@ export default function PrecificacaoPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {saved && (
-              <span className="text-sm font-medium text-green-500">Simulação salva!</span>
-            )}
             <Button variant="outline" size="sm" className="gap-2" disabled>
               <History className="h-4 w-4" />
               Histórico
@@ -220,9 +284,10 @@ export default function PrecificacaoPage() {
               size="sm"
               className="gap-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700"
               onClick={handleSave}
+              disabled={saving}
             >
-              <Save className="h-4 w-4" />
-              Salvar Simulação
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : savedAt ? <CheckCircle className="h-4 w-4 text-white" /> : <Save className="h-4 w-4" />}
+              {saving ? 'Salvando...' : savedAt ? `Salvo ${savedAt}` : 'Salvar Simulação'}
             </Button>
           </div>
         </div>
