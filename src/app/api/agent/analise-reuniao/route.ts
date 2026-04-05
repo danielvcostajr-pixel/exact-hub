@@ -100,15 +100,16 @@ export async function POST(request: NextRequest) {
 
     // Accept either raw text or file (base64)
     if (body.fileBase64 && body.fileName) {
-      transcricao = await extractTextFromFile(body.fileBase64, body.fileName)
-      if (!transcricao || transcricao.trim().length < 20) {
+      const extracted = await extractTextFromFile(body.fileBase64, body.fileName)
+      transcricao = String(extracted || '')
+      if (transcricao.trim().length < 20) {
         return NextResponse.json(
           { error: 'Nao foi possivel extrair texto do arquivo. Tente copiar e colar o conteudo diretamente.' },
           { status: 400 },
         )
       }
-    } else if (body.transcricao && typeof body.transcricao === 'string') {
-      transcricao = body.transcricao
+    } else if (body.transcricao) {
+      transcricao = String(body.transcricao)
     } else {
       return NextResponse.json(
         { error: 'Envie uma transcricao (texto) ou um arquivo (fileBase64 + fileName).' },
@@ -141,7 +142,7 @@ export async function POST(request: NextRequest) {
     const completion = await openai.chat.completions.create({
       model: 'gpt-5.4-nano',
       temperature: 0.3,
-      max_tokens: 8192,
+      max_completion_tokens: 8192,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
