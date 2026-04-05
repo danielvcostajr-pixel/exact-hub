@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { MatrizRACI, type AcaoRaci, type UsuarioRaci } from '@/components/planejamento/MatrizRACI'
-import { getPlanosAcaoByEmpresa, createPlanoAcao, createAcao, updateAcao, getUsuarios } from '@/lib/api/data-service'
+import { getPlanosAcaoByEmpresa, createPlanoAcao, createAcao, updateAcao, getUsuarios, getOKRsByEmpresa, createTarefa, getCurrentUserId } from '@/lib/api/data-service'
 
 type StatusAcao = 'Pendente' | 'Em Andamento' | 'Concluida' | 'Bloqueada'
 
@@ -104,13 +104,15 @@ const DB_STATUS_VALUES: Record<StatusAcao, string> = {
   Bloqueada: 'CANCELADA',
 }
 
-function PlanoCard({ plano, usuarios, onReload }: { plano: PlanoAcao; usuarios: UsuarioRaci[]; onReload: () => Promise<void> }) {
+function PlanoCard({ plano, usuarios, empresaId, onReload }: { plano: PlanoAcao; usuarios: UsuarioRaci[]; empresaId: string; onReload: () => Promise<void> }) {
   const [expanded, setExpanded] = useState(false)
   const [activeTab, setActiveTab] = useState<'acoes' | 'raci'>('acoes')
   const [showNovaAcao, setShowNovaAcao] = useState(false)
   const [novaAcaoDesc, setNovaAcaoDesc] = useState('')
   const [novaAcaoPrazo, setNovaAcaoPrazo] = useState('')
   const [novaAcaoStatus, setNovaAcaoStatus] = useState('PENDENTE')
+  const [novaAcaoResponsavel, setNovaAcaoResponsavel] = useState('')
+  const [novaAcaoPrioridade, setNovaAcaoPrioridade] = useState('MEDIA')
   const [salvandoAcao, setSalvandoAcao] = useState(false)
   const [updatingAcaoId, setUpdatingAcaoId] = useState<string | null>(null)
   const progress = calcProgress(plano.acoes)
@@ -127,15 +129,33 @@ function PlanoCard({ plano, usuarios, onReload }: { plano: PlanoAcao; usuarios: 
     if (!novaAcaoDesc.trim()) return
     setSalvandoAcao(true)
     try {
+      // 1. Create the acao in PlanoAcao
       await createAcao({
         planoId: plano.id,
         descricao: novaAcaoDesc.trim(),
         prazo: novaAcaoPrazo || undefined,
         status: novaAcaoStatus,
       })
+
+      // 2. Also create a Tarefa linked to the OKR (if plano has okrVinculadoId)
+      const userId = await getCurrentUserId()
+      await createTarefa({
+        empresaId,
+        titulo: novaAcaoDesc.trim(),
+        descricao: `Plano: ${plano.titulo}`,
+        status: novaAcaoStatus === 'CONCLUIDA' ? 'CONCLUIDA' : 'A_FAZER',
+        prioridade: novaAcaoPrioridade,
+        prazo: novaAcaoPrazo || undefined,
+        responsavelId: novaAcaoResponsavel || undefined,
+        criadoPorId: userId || 'system',
+        okrId: plano.okrVinculadoId || undefined,
+      })
+
       setNovaAcaoDesc('')
       setNovaAcaoPrazo('')
       setNovaAcaoStatus('PENDENTE')
+      setNovaAcaoResponsavel('')
+      setNovaAcaoPrioridade('MEDIA')
       setShowNovaAcao(false)
       await onReload()
     } catch (err) {
@@ -317,15 +337,29 @@ function PlanoCard({ plano, usuarios, onReload }: { plano: PlanoAcao; usuarios: 
               {showNovaAcao && (
                 <div className="rounded-lg border border-primary/30 bg-background p-3 flex flex-col gap-3">
                   <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs">Descricao *</Label>
+                    <Label className="text-xs">Descricao da acao *</Label>
                     <Input
                       placeholder="Ex: Mapear concorrentes da regiao"
                       value={novaAcaoDesc}
                       onChange={(e) => setNovaAcaoDesc(e.target.value)}
                       className="h-8 text-sm"
+                      autoFocus
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="flex flex-col gap-1.5">
+                      <Label className="text-xs">Responsavel</Label>
+                      <Select value={novaAcaoResponsavel} onValueChange={setNovaAcaoResponsavel}>
+                        <SelectTrigger className="h-8 text-sm">
+                          <SelectValue placeholder="Selecionar..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {usuarios.map(u => (
+                            <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="flex flex-col gap-1.5">
                       <Label className="text-xs">Prazo</Label>
                       <Input
@@ -334,6 +368,20 @@ function PlanoCard({ plano, usuarios, onReload }: { plano: PlanoAcao; usuarios: 
                         onChange={(e) => setNovaAcaoPrazo(e.target.value)}
                         className="h-8 text-sm"
                       />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label className="text-xs">Prioridade</Label>
+                      <Select value={novaAcaoPrioridade} onValueChange={setNovaAcaoPrioridade}>
+                        <SelectTrigger className="h-8 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="URGENTE">Urgente</SelectItem>
+                          <SelectItem value="ALTA">Alta</SelectItem>
+                          <SelectItem value="MEDIA">Media</SelectItem>
+                          <SelectItem value="BAIXA">Baixa</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <Label className="text-xs">Status</Label>
@@ -350,6 +398,9 @@ function PlanoCard({ plano, usuarios, onReload }: { plano: PlanoAcao; usuarios: 
                       </Select>
                     </div>
                   </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Esta acao sera criada tambem como tarefa no painel geral{plano.okrVinculadoId ? ', vinculada ao OKR do plano' : ''}.
+                  </p>
                   <div className="flex items-center gap-2 justify-end">
                     <Button
                       variant="ghost"
@@ -404,6 +455,8 @@ export default function PlanosAcaoPage() {
   const { clienteAtivo, isFiltered } = useClienteContext()
   const [planos, setPlanos] = useState<PlanoAcao[]>([])
   const [usuarios, setUsuarios] = useState<UsuarioRaci[]>([])
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [okrs, setOkrs] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -411,15 +464,18 @@ export default function PlanosAcaoPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [formTitulo, setFormTitulo] = useState('')
   const [formDescricao, setFormDescricao] = useState('')
+  const [formOkrId, setFormOkrId] = useState('')
 
   const loadData = useCallback(async () => {
     if (!clienteAtivo) return
     setLoading(true)
     try {
-      const [planosData, usuariosData] = await Promise.all([
+      const [planosData, usuariosData, okrsData] = await Promise.all([
         getPlanosAcaoByEmpresa(clienteAtivo.id),
         getUsuarios(),
+        getOKRsByEmpresa(clienteAtivo.id),
       ])
+      setOkrs(okrsData ?? [])
       setPlanos((planosData ?? []).map((r: Record<string, unknown>) => dbToPlano(r)))
       setUsuarios(
         (usuariosData ?? []).map((u: Record<string, unknown>) => ({
@@ -442,6 +498,7 @@ export default function PlanosAcaoPage() {
   function openDialog() {
     setFormTitulo('')
     setFormDescricao('')
+    setFormOkrId('')
     setDialogOpen(true)
   }
 
@@ -453,6 +510,7 @@ export default function PlanosAcaoPage() {
         empresaId: clienteAtivo.id,
         titulo: formTitulo.trim(),
         descricao: formDescricao.trim() || undefined,
+        okrId: formOkrId || undefined,
       })
       setDialogOpen(false)
       await loadData()
@@ -539,7 +597,7 @@ export default function PlanosAcaoPage() {
           {/* Plans list */}
           <div className="flex flex-col gap-3">
             {planos.map((plano) => (
-              <PlanoCard key={plano.id} plano={plano} usuarios={usuarios} onReload={loadData} />
+              <PlanoCard key={plano.id} plano={plano} usuarios={usuarios} empresaId={clienteAtivo!.id} onReload={loadData} />
             ))}
             {planos.length === 0 && (
               <div className="flex flex-col items-center justify-center py-16 gap-4">
@@ -585,6 +643,19 @@ export default function PlanosAcaoPage() {
                 onChange={(e) => setFormDescricao(e.target.value)}
                 className="resize-none h-24"
               />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-sm">Vincular a OKR (opcional)</Label>
+              <Select value={formOkrId} onValueChange={setFormOkrId}>
+                <SelectTrigger><SelectValue placeholder="Nenhum OKR vinculado" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {okrs.map((o: { id: string; objetivo: string }) => (
+                    <SelectItem key={o.id} value={o.id}>{o.objetivo}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground">As acoes deste plano serao vinculadas ao OKR selecionado como tarefas.</p>
             </div>
           </div>
           <DialogFooter>
