@@ -27,6 +27,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { SimulacaoHistorico } from '@/components/simuladores/SimulacaoHistorico'
 import {
   LineChart,
   Line,
@@ -119,6 +120,30 @@ export default function PontoEquilibrioPage() {
   // ── save state ──────────────────────────────────────────────────────────
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  // ── Load from historico callback ────────────────────────────────────────
+  const handleLoadSimulacao = useCallback((inputs: Record<string, unknown>, outputs: Record<string, unknown>) => {
+    const inp = inputs as {
+      custosFixos?: string
+      custosVariaveis?: string
+      faturamentoAtual?: string
+      importarProjecao?: boolean
+      custosFixosU?: string
+      precoUnitario?: string
+      custoVariavelU?: string
+    }
+    if (inp.custosFixos !== undefined) setCustosFixos(inp.custosFixos)
+    if (inp.custosVariaveis !== undefined) setCustosVariaveis(inp.custosVariaveis)
+    if (inp.faturamentoAtual !== undefined) setFaturamentoAtual(inp.faturamentoAtual)
+    if (inp.importarProjecao !== undefined) setImportarProjecao(inp.importarProjecao)
+    if (inp.custosFixosU !== undefined) setCustosFixosU(inp.custosFixosU)
+    if (inp.precoUnitario !== undefined) setPrecoUnitario(inp.precoUnitario)
+    if (inp.custoVariavelU !== undefined) setCustoVariavelU(inp.custoVariavelU)
+    const out = outputs as { resultadoFin?: ResultadoFinanceiro; resultadoUni?: ResultadoUnidades }
+    if (out.resultadoFin !== undefined) setResultadoFin(out.resultadoFin)
+    if (out.resultadoUni !== undefined) setResultadoUni(out.resultadoUni)
+  }, [])
 
   // ── Load saved data on mount ────────────────────────────────────────────
   useEffect(() => {
@@ -175,6 +200,7 @@ export default function PontoEquilibrioPage() {
         criadoPorId: userId || 'system',
       })
       setSavedAt(new Date().toLocaleString('pt-BR'))
+      setRefreshKey(k => k + 1)
     } catch (err) {
       console.error('Erro ao salvar simulador:', err)
     } finally {
@@ -792,6 +818,16 @@ export default function PontoEquilibrioPage() {
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Historico de simulacoes */}
+        {clienteAtivo && (
+          <SimulacaoHistorico
+            empresaId={clienteAtivo.id}
+            tipo="ponto-equilibrio"
+            onLoad={handleLoadSimulacao}
+            refreshKey={refreshKey}
+          />
+        )}
       </div>
     </div>
   )

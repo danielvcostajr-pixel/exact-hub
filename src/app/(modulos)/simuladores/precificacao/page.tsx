@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { useClienteContext } from '@/hooks/useClienteContext'
 import { saveSimulador, getSimuladorByEmpresa, getCurrentUserId } from '@/lib/api/data-service'
+import { SimulacaoHistorico } from '@/components/simuladores/SimulacaoHistorico'
 import {
   Card,
   CardContent,
@@ -112,6 +113,34 @@ export default function PrecificacaoPage() {
   // Save state
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  // ── Load from historico callback ────────────────────────────────────────
+  const handleLoadSimulacao = useCallback((inputs: Record<string, unknown>, outputs: Record<string, unknown>) => {
+    const inp = inputs as {
+      custoProduto?: string
+      custosFixosRateados?: string
+      impostos?: string
+      comissoes?: string
+      metodo?: Metodo
+      markupPercentual?: string
+      margemDesejada?: string
+      sensibilidade?: boolean
+      volumeBase?: string
+    }
+    if (inp.custoProduto !== undefined) setCustoProduto(inp.custoProduto)
+    if (inp.custosFixosRateados !== undefined) setCustosFixosRateados(inp.custosFixosRateados)
+    if (inp.impostos !== undefined) setImpostos(inp.impostos)
+    if (inp.comissoes !== undefined) setComissoes(inp.comissoes)
+    if (inp.metodo !== undefined) setMetodo(inp.metodo)
+    if (inp.markupPercentual !== undefined) setMarkupPercentual(inp.markupPercentual)
+    if (inp.margemDesejada !== undefined) setMargemDesejada(inp.margemDesejada)
+    if (inp.sensibilidade !== undefined) setSensibilidade(inp.sensibilidade)
+    if (inp.volumeBase !== undefined) setVolumeBase(inp.volumeBase)
+    const out = outputs as { resultado?: ResultadoPrecificacao; linhasSensibilidade?: LinhasSensibilidade[] }
+    if (out.resultado !== undefined) setResultado(out.resultado)
+    if (out.linhasSensibilidade !== undefined) setLinhasSensibilidade(out.linhasSensibilidade)
+  }, [])
 
   // ── Load saved data on mount ────────────────────────────────────────────
   useEffect(() => {
@@ -174,6 +203,7 @@ export default function PrecificacaoPage() {
         criadoPorId: userId || 'system',
       })
       setSavedAt(new Date().toLocaleString('pt-BR'))
+      setRefreshKey(k => k + 1)
     } catch (err) {
       console.error('Erro ao salvar simulador:', err)
     } finally {
@@ -806,6 +836,16 @@ export default function PrecificacaoPage() {
             )}
           </div>
         </div>
+
+        {/* Historico de simulacoes */}
+        {clienteAtivo && (
+          <SimulacaoHistorico
+            empresaId={clienteAtivo.id}
+            tipo="precificacao"
+            onLoad={handleLoadSimulacao}
+            refreshKey={refreshKey}
+          />
+        )}
       </div>
     </div>
   )

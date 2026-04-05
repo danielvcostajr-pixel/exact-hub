@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { useClienteContext } from '@/hooks/useClienteContext'
 import { saveSimulador, getSimuladorByEmpresa, getCurrentUserId } from '@/lib/api/data-service'
+import { SimulacaoHistorico } from '@/components/simuladores/SimulacaoHistorico'
 import {
   LineChart,
   Line,
@@ -167,6 +168,19 @@ export default function CenariosPage() {
   const [simulado, setSimulado] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  // ── Load from historico callback ────────────────────────────────────────
+  const handleLoadSimulacao = useCallback((inputs: Record<string, unknown>, outputs: Record<string, unknown>) => {
+    const inp = inputs as { base?: BaseData; cenarios?: Cenario[] }
+    if (inp.base) setBase(inp.base)
+    if (inp.cenarios) setCenarios(inp.cenarios)
+    const out = outputs as { resultados?: CenarioResult[] }
+    if (out.resultados) {
+      setResultados(out.resultados)
+      setSimulado(true)
+    }
+  }, [])
 
   // Load saved data on mount
   useEffect(() => {
@@ -203,6 +217,7 @@ export default function CenariosPage() {
         criadoPorId: userId || 'system',
       })
       setSavedAt(new Date().toLocaleString('pt-BR'))
+      setRefreshKey(k => k + 1)
     } catch (err) {
       console.error('Erro ao salvar simulador:', err)
     } finally {
@@ -594,6 +609,16 @@ export default function CenariosPage() {
             </ResponsiveContainer>
           </div>
         </>
+      )}
+
+      {/* Historico de simulacoes */}
+      {clienteAtivo && (
+        <SimulacaoHistorico
+          empresaId={clienteAtivo.id}
+          tipo="cenarios"
+          onLoad={handleLoadSimulacao}
+          refreshKey={refreshKey}
+        />
       )}
     </div>
   )

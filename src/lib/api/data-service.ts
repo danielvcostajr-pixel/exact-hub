@@ -573,7 +573,17 @@ export async function getSimuladorByEmpresa(empresaId: string, tipo: string) {
   const supabase = createClient()
   const { data, error } = await supabase
     .from('Simulador').select('*').eq('empresaId', empresaId).eq('tipo', tipo)
-    .order('updatedAt', { ascending: false }).limit(1).maybeSingle()
+    .order('createdAt', { ascending: false }).limit(1).maybeSingle()
+  if (error) throw error
+  return data
+}
+
+export async function getSimuladorHistorico(empresaId: string, tipo: string) {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('Simulador').select('id, nome, createdAt, inputs, outputs')
+    .eq('empresaId', empresaId).eq('tipo', tipo)
+    .order('createdAt', { ascending: false }).limit(20)
   if (error) throw error
   return data
 }
@@ -582,22 +592,20 @@ export async function saveSimulador(params: {
   empresaId: string; tipo: string; nome: string; inputs: unknown; outputs: unknown; criadoPorId: string
 }) {
   const supabase = createClient()
-  const existing = await getSimuladorByEmpresa(params.empresaId, params.tipo)
-  if (existing) {
-    const { data, error } = await supabase.from('Simulador').update({
-      inputs: params.inputs, outputs: params.outputs, nome: params.nome,
-    }).eq('id', existing.id).select().single()
-    if (error) throw error
-    return data
-  } else {
-    const { data, error } = await supabase.from('Simulador').insert({
-      empresaId: params.empresaId, tipo: params.tipo, nome: params.nome,
-      inputs: params.inputs, outputs: params.outputs,
-      criadoPorId: params.criadoPorId, ativoParaCliente: false,
-    }).select().single()
-    if (error) throw error
-    return data
-  }
+  // Always create a new record (historico)
+  const { data, error } = await supabase.from('Simulador').insert({
+    empresaId: params.empresaId, tipo: params.tipo, nome: params.nome,
+    inputs: params.inputs, outputs: params.outputs,
+    criadoPorId: params.criadoPorId, ativoParaCliente: false,
+  }).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteSimulacao(simuladorId: string) {
+  const supabase = createClient()
+  const { error } = await supabase.from('Simulador').delete().eq('id', simuladorId)
+  if (error) throw error
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

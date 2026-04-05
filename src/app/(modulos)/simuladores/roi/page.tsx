@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { useClienteContext } from '@/hooks/useClienteContext'
 import { saveSimulador, getSimuladorByEmpresa, getCurrentUserId } from '@/lib/api/data-service'
+import { SimulacaoHistorico } from '@/components/simuladores/SimulacaoHistorico'
 import {
   Area,
   XAxis,
@@ -217,6 +218,18 @@ export default function ROIPage() {
   // Save state
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  // ── Load from historico callback ────────────────────────────────────────
+  const handleLoadSimulacao = useCallback((inputs: Record<string, unknown>, outputs: Record<string, unknown>) => {
+    const inp = inputs as Partial<InputData>
+    setInput((prev) => ({ ...prev, ...inp }))
+    const out = outputs as { resultado?: KPIResult }
+    if (out.resultado) {
+      setResultado(out.resultado)
+      setCalculado(true)
+    }
+  }, [])
 
   // ── Load saved data on mount ────────────────────────────────────────────
   useEffect(() => {
@@ -252,6 +265,7 @@ export default function ROIPage() {
         criadoPorId: userId || 'system',
       })
       setSavedAt(new Date().toLocaleString('pt-BR'))
+      setRefreshKey(k => k + 1)
     } catch (err) {
       console.error('Erro ao salvar simulador:', err)
     } finally {
@@ -703,6 +717,16 @@ export default function ROIPage() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Historico de simulacoes */}
+      {clienteAtivo && (
+        <SimulacaoHistorico
+          empresaId={clienteAtivo.id}
+          tipo="roi"
+          onLoad={handleLoadSimulacao}
+          refreshKey={refreshKey}
+        />
       )}
     </div>
   )
