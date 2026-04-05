@@ -173,6 +173,7 @@ export default function TarefaListView({
               const statusCfg = STATUS_CONFIG[tarefa.status]
               const prioridadeCfg = PRIORIDADE_CONFIG[tarefa.prioridade]
               const isOverdue =
+                tarefa.prazo &&
                 tarefa.status !== "CONCLUIDA" &&
                 tarefa.status !== "CANCELADA" &&
                 isPast(parseISO(tarefa.prazo))
@@ -248,7 +249,7 @@ export default function TarefaListView({
                         isOverdue ? "text-red-500" : "text-foreground"
                       )}
                     >
-                      {format(parseISO(tarefa.prazo), "dd/MM/yyyy", { locale: ptBR })}
+                      {tarefa.prazo ? format(parseISO(tarefa.prazo), "dd/MM/yyyy", { locale: ptBR }) : "Sem prazo"}
                       {isOverdue && (
                         <span className="block text-xs text-red-500 font-normal">Atrasada</span>
                       )}

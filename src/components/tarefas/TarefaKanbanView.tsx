@@ -72,6 +72,7 @@ function KanbanCard({ tarefa, onClick, isDragging }: KanbanCardProps) {
 
   const prioridadeCfg = PRIORIDADE_CONFIG[tarefa.prioridade]
   const isOverdue =
+    tarefa.prazo &&
     tarefa.status !== "CONCLUIDA" &&
     tarefa.status !== "CANCELADA" &&
     isPast(parseISO(tarefa.prazo))
@@ -170,7 +171,7 @@ function KanbanCard({ tarefa, onClick, isDragging }: KanbanCardProps) {
             )}
           >
             <Calendar className="h-3 w-3" />
-            {format(parseISO(tarefa.prazo), "dd/MM", { locale: ptBR })}
+            {tarefa.prazo ? format(parseISO(tarefa.prazo), "dd/MM", { locale: ptBR }) : "—"}
           </span>
         </div>
       </div>

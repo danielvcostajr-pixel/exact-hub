@@ -50,9 +50,10 @@ export default function TarefaGanttView({
     }
 
     const allDates = tarefas.flatMap((t) => [
-      parseISO(t.dataInicio),
-      parseISO(t.prazo),
-    ])
+      t.dataInicio ? parseISO(t.dataInicio) : new Date(),
+      t.prazo ? parseISO(t.prazo) : new Date(),
+    ]).filter((d) => !isNaN(d.getTime()))
+    if (allDates.length === 0) allDates.push(new Date())
     const minDate = new Date(Math.min(...allDates.map((d) => d.getTime())))
     const maxDate = new Date(Math.max(...allDates.map((d) => d.getTime())))
 
