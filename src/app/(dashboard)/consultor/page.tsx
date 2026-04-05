@@ -952,14 +952,16 @@ function ClientFocusedView({ clientId }: { clientId: string }) {
           const mapped: Task[] = data.map((t: { id: string; titulo: string; empresaId: string; prioridade?: string; prazo?: string; status?: string }) => {
             const prazoDate = t.prazo ? new Date(t.prazo) : null
             const prioMap: Record<string, Priority> = { URGENTE: "Alta", ALTA: "Alta", MEDIA: "Media", BAIXA: "Baixa" }
-            let taskStatus: TaskStatus = "Proxima Semana"
+            let taskStatus: TaskStatus = "Esta Semana"
             if (prazoDate) {
               const diff = Math.floor((prazoDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
               if (diff < 0) taskStatus = "Atrasada"
               else if (diff === 0) taskStatus = "Hoje"
               else if (diff <= 7) taskStatus = "Esta Semana"
+              else taskStatus = "Proxima Semana"
             }
-            if (t.status === "CONCLUIDA") taskStatus = "Proxima Semana"
+            // Exclude completed tasks
+            if (t.status === "CONCLUIDA") return null
             return {
               id: t.id,
               name: t.titulo,
@@ -970,7 +972,7 @@ function ClientFocusedView({ clientId }: { clientId: string }) {
               deadlineDate: prazoDate ?? now,
               status: taskStatus,
             }
-          }).filter((t: Task) => t.status !== "Proxima Semana")
+          }).filter((t): t is Task => t !== null)
           setRealTasks(mapped)
         }
       } catch { /* ignore */ }
@@ -1264,12 +1266,13 @@ function ConsolidatedView() {
             for (const t of data) {
               const prazoDate = t.prazo ? new Date(t.prazo) : null
               const prioMap: Record<string, Priority> = { URGENTE: "Alta", ALTA: "Alta", MEDIA: "Media", BAIXA: "Baixa" }
-              let taskStatus: TaskStatus = "Proxima Semana"
+              let taskStatus: TaskStatus = "Esta Semana"
               if (prazoDate) {
                 const diff = Math.floor((prazoDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
                 if (diff < 0) taskStatus = "Atrasada"
                 else if (diff === 0) taskStatus = "Hoje"
                 else if (diff <= 7) taskStatus = "Esta Semana"
+                else taskStatus = "Proxima Semana"
               }
               if (t.status === "CONCLUIDA") continue
               tasks.push({
