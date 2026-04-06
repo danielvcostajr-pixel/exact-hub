@@ -39,6 +39,7 @@ const consultorSections: NavSection[] = [
       { title: "Projecao Financeira", href: "/projecao-financeira", icon: TrendingUp },
       { title: "Canvas de Negocio", href: "/canvas-negocio", icon: Grid3x3 },
       { title: "Entrevistas", href: "/entrevistas", icon: MessageSquare },
+      { title: "Quick Wins", href: "/diagnostico/quickwins", icon: Zap },
     ],
   },
   {
