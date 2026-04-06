@@ -91,6 +91,13 @@ enum StatusReuniao {
   CANCELADA
 }
 
+enum StatusQuickWin {
+  PENDENTE
+  EM_ANDAMENTO
+  CONCLUIDO
+  DESCARTADO
+}
+
 // ─── Models existentes ────────────────────────────────────────────────────────
 
 model Usuario {
@@ -162,6 +169,7 @@ model Empresa {
   relatoriosSemanais RelatorioSemanal[]
   fechamentosMensais FechamentoMensal[]
   simuladores        Simulador[]
+  quickWins          QuickWin[]
 }
 
 model ProjecaoFinanceira {
@@ -728,4 +736,28 @@ model HistoricoSimulacao {
   @@index([simuladorId])
   @@index([createdAt])
   @@index([executadoPorId])
+}
+
+// ─── Quick Wins ──────────────────────────────────────────────────────────────
+
+model QuickWin {
+  id          String         @id @default(uuid())
+  empresaId   String
+  empresa     Empresa        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  titulo      String
+  categoria   String
+  impacto     Int            @default(5)
+  esforco     Int            @default(5)
+  quadrante   String?
+  aplicavel   Boolean        @default(true)
+  status      StatusQuickWin @default(PENDENTE)
+  responsavel String?
+  prazo       DateTime?
+  observacoes String?        @db.Text
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([empresaId])
+  @@index([status])
+  @@index([categoria])
 }

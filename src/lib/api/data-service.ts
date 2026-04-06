@@ -566,6 +566,85 @@ export async function createResposta(params: {
   return data
 }
 
+// ── Quick Wins ──────────────────────────────────────────────────────────────
+
+function calcQuadrante(impacto: number, esforco: number): string {
+  const score = impacto / esforco
+  if (score >= 3) return 'PRIORIDADE MAXIMA'
+  if (score >= 2) return 'Alta Prioridade'
+  if (score >= 1.5) return 'Media Prioridade'
+  return 'Baixa Prioridade'
+}
+
+export async function getQuickWinsByEmpresa(empresaId: string) {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('QuickWin').select('*').eq('empresaId', empresaId)
+    .order('impacto', { ascending: false })
+  if (error) throw error
+  return data
+}
+
+export async function createQuickWin(params: {
+  empresaId: string; titulo: string; categoria: string
+  impacto?: number; esforco?: number
+}) {
+  const supabase = createClient()
+  const impacto = params.impacto ?? 5
+  const esforco = params.esforco ?? 5
+  const { data, error } = await supabase.from('QuickWin').insert({
+    empresaId: params.empresaId,
+    titulo: params.titulo,
+    categoria: params.categoria,
+    impacto,
+    esforco,
+    quadrante: calcQuadrante(impacto, esforco),
+    aplicavel: true,
+    status: 'PENDENTE',
+  }).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function updateQuickWin(quickWinId: string, updates: Record<string, unknown>) {
+  const supabase = createClient()
+  if (updates.impacto !== undefined || updates.esforco !== undefined) {
+    const { data: current } = await supabase.from('QuickWin').select('impacto, esforco').eq('id', quickWinId).single()
+    if (current) {
+      const imp = (updates.impacto as number) ?? current.impacto
+      const esf = (updates.esforco as number) ?? current.esforco
+      updates.quadrante = calcQuadrante(imp, esf)
+    }
+  }
+  const { data, error } = await supabase.from('QuickWin').update({ ...updates }).eq('id', quickWinId).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteQuickWin(quickWinId: string) {
+  const supabase = createClient()
+  const { error } = await supabase.from('QuickWin').delete().eq('id', quickWinId)
+  if (error) throw error
+}
+
+export async function seedQuickWinsParaEmpresa(empresaId: string) {
+  const { QUICK_WINS_TEMPLATE } = await import('@/lib/quick-wins-template')
+  const supabase = createClient()
+  const rows = QUICK_WINS_TEMPLATE.map(t => ({
+    empresaId,
+    titulo: t.titulo,
+    categoria: t.categoria,
+    impacto: t.impacto,
+    esforco: t.esforco,
+    quadrante: calcQuadrante(t.impacto, t.esforco),
+    aplicavel: true,
+    status: 'PENDENTE' as const,
+  }))
+  const { data, error } = await supabase.from('QuickWin').insert(rows).select()
+  if (error) throw error
+  return data
+}
+
 // ── Memoria do Cliente ───────────────────────────────────────────────────────
 
 export async function getMemoriaByEmpresa(empresaId: string) {

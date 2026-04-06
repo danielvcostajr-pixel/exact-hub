@@ -343,6 +343,28 @@ export interface AnaliseEntrevista {
 }
 
 // ============================================
+// Quick Wins
+// ============================================
+export type StatusQuickWin = 'PENDENTE' | 'EM_ANDAMENTO' | 'CONCLUIDO' | 'DESCARTADO'
+
+export interface QuickWin {
+  id: string
+  empresaId: string
+  titulo: string
+  categoria: string
+  impacto: number
+  esforco: number
+  quadrante: string | null
+  aplicavel: boolean
+  status: StatusQuickWin
+  responsavel: string | null
+  prazo: string | null
+  observacoes: string | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+// ============================================
 // Memoria do Cliente
 // ============================================
 export interface MemoriaCliente {

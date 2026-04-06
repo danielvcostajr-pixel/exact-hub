@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, ClipboardList, MessageSquare, BarChart3, Eye, Send, CheckCircle, FileText, ArrowLeft, UserPlus, X, Loader2 } from 'lucide-react'
+import { Plus, ClipboardList, MessageSquare, BarChart3, Eye, Send, CheckCircle, FileText, ArrowLeft, UserPlus, X, Loader2, Zap } from 'lucide-react'
 import { useClienteContext } from '@/hooks/useClienteContext'
 import { getEntrevistasByEmpresa, getRespostasByEntrevista, createResposta } from '@/lib/api/data-service'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { FormQuestionario } from '@/components/entrevistas/FormQuestionario'
+import { QuickWinsTab } from '@/components/entrevistas/QuickWinsTab'
 import { RespostaCard } from '@/components/entrevistas/RespostaCard'
 import { AnalisePareto } from '@/components/entrevistas/AnalisePareto'
 import { Entrevista, RespostaEntrevista, StatusEntrevista, Pergunta } from '@/types'
@@ -426,6 +427,13 @@ export default function EntrevistasPage() {
             <BarChart3 size={13} />
             Analise
           </TabsTrigger>
+          <TabsTrigger
+            value="quickwins"
+            className="data-[state=active]:bg-primary data-[state=active]:text-white text-muted-foreground gap-1.5"
+          >
+            <Zap size={13} />
+            Quick Wins
+          </TabsTrigger>
         </TabsList>
 
         {/* Tab: Questionarios */}
@@ -594,6 +602,11 @@ export default function EntrevistasPage() {
               )}
             </div>
           )}
+        </TabsContent>
+
+        {/* Tab: Quick Wins */}
+        <TabsContent value="quickwins" className="mt-4">
+          <QuickWinsTab />
         </TabsContent>
       </Tabs>
 
