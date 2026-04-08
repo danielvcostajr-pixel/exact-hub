@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
@@ -63,18 +64,11 @@ function MesSelect({ value, onChange }: { value: number; onChange: (v: number) =
 
 function ValorInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   return (
-    <div className="relative">
-      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs pointer-events-none text-muted-foreground">R$</span>
-      <Input
-        type="number"
-        min={0}
-        step={100}
-        value={value || ''}
-        onChange={e => onChange(parseFloat(e.target.value) || 0)}
-        placeholder="0"
-        className="pl-8 h-8 text-sm bg-background border-border text-foreground"
-      />
-    </div>
+    <CurrencyInput
+      value={value}
+      onChange={onChange}
+      className="h-8"
+    />
   )
 }
 
@@ -502,18 +496,11 @@ export default function EtapaInvestimentos({
                       />
                     </td>
                     <td className="py-2 pr-2">
-                      <div className="relative">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">R$</span>
-                        <Input
-                          type="number"
-                          min={0}
-                          step={100}
-                          value={conta.valor || ''}
-                          onChange={e => updateCR(conta.id!, 'valor', parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                          className="pl-8 h-8 text-sm bg-background border-border text-foreground"
-                        />
-                      </div>
+                      <CurrencyInput
+                        value={conta.valor || 0}
+                        onChange={v => updateCR(conta.id!, 'valor', v)}
+                        className="h-8"
+                      />
                     </td>
                     <td className="py-2 pr-2">
                       <MesSelect

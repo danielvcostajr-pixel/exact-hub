@@ -29,6 +29,7 @@ import EtapaRecebimentos from '@/components/projecao/EtapaRecebimentos'
 import EtapaDespesas from '@/components/projecao/EtapaDespesas'
 import EtapaPagamentos from '@/components/projecao/EtapaPagamentos'
 import EtapaInvestimentos from '@/components/projecao/EtapaInvestimentos'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import {
   TrendingUp,
   ArrowLeftRight,
@@ -535,18 +536,11 @@ export default function ProjecaoFinanceiraPage() {
           <label className="text-xs font-medium text-muted-foreground whitespace-nowrap">
             Saldo Inicial de Caixa
           </label>
-          <div className="relative">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">R$</span>
-            <input
-              type="number"
-              min={0}
-              step={100}
-              value={dados.saldoInicial}
-              onChange={(e) => setDados((d) => ({ ...d, saldoInicial: Number(e.target.value) || 0 }))}
-              className="w-44 pl-8 pr-3 py-1.5 rounded-lg border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
-              placeholder="0,00"
-            />
-          </div>
+          <CurrencyInput
+            value={dados.saldoInicial}
+            onChange={(v) => setDados((d) => ({ ...d, saldoInicial: v }))}
+            className="w-44 bg-card"
+          />
         </div>
       </div>
 

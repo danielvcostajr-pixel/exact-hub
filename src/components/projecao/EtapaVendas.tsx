@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import type { PremissasVendas, HistoricoFaturamento, CenarioTipo } from '@/types'
@@ -111,20 +112,11 @@ export default function EtapaVendas({ premissas, onChange, anoBase, onAnoBaseCha
                 <Label className="text-xs font-medium text-muted-foreground">
                   {mes}
                 </Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs pointer-events-none text-muted-foreground">
-                    R$
-                  </span>
-                  <Input
-                    type="number"
-                    min={0}
-                    step={100}
-                    placeholder="0,00"
-                    value={getHistoricoValor(i)}
-                    onChange={e => handleHistoricoChange(i, e.target.value)}
-                    className="pl-8 text-sm h-9 bg-background border-border text-foreground"
+                <CurrencyInput
+                    value={parseFloat(getHistoricoValor(i)) || 0}
+                    onChange={v => handleHistoricoChange(i, String(v))}
+                    className="h-9"
                   />
-                </div>
               </div>
             ))}
           </div>

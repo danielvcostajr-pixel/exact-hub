@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import type { DespesasCompletas, GastoVariavel, GastoFixo, CategoriaDespesa, ReajusteMensal } from '@/types'
@@ -117,18 +118,11 @@ function FixoRow({ item, onUpdate, onDelete }: FixoRowProps) {
           />
         </td>
         <td className="py-2 pr-2">
-          <div className="relative">
-            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">R$</span>
-            <Input
-              type="number"
-              min={0}
-              step={100}
-              value={valor}
-              onChange={e => handleValorChange(e.target.value)}
-              placeholder="0"
-              className="pl-8 h-8 text-sm bg-background border-border text-foreground"
-            />
-          </div>
+          <CurrencyInput
+            value={parseFloat(valor) || 0}
+            onChange={v => handleValorChange(String(v))}
+            className="h-8"
+          />
         </td>
         <td className="py-2">
           <div className="flex gap-1">
@@ -195,17 +189,11 @@ function FixoRow({ item, onUpdate, onDelete }: FixoRowProps) {
                     </SelectContent>
                   </Select>
                   <span className="text-[11px] text-muted-foreground">novo valor:</span>
-                  <div className="relative">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">R$</span>
-                    <Input
-                      type="number"
-                      min={0}
-                      step={100}
-                      value={r.novoValor || ''}
-                      onChange={e => updateReajuste(idx, 'novoValor', parseFloat(e.target.value) || 0)}
-                      className="pl-7 h-7 w-[100px] text-xs bg-background border-border text-foreground"
-                    />
-                  </div>
+                  <CurrencyInput
+                    value={r.novoValor || 0}
+                    onChange={v => updateReajuste(idx, 'novoValor', v)}
+                    className="h-7 w-[120px] text-xs"
+                  />
                   <button onClick={() => removeReajuste(idx)} className="p-1 rounded hover:bg-red-900/30">
                     <X size={11} style={{ color: '#ef4444' }} />
                   </button>
