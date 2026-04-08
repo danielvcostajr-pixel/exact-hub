@@ -30,7 +30,7 @@ export default function PlanejamentoLayout({ children }: { children: React.React
     <DashboardLayout>
       <div className="flex flex-col gap-0 h-full">
         {/* Sub-navigation */}
-        <nav className="flex items-center gap-1 border-b border-border pb-0 mb-6 overflow-x-auto">
+        <nav className="flex items-center gap-1 border-b border-border mb-6 overflow-x-auto">
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
             const isActive = pathname.startsWith(href)
             return (
