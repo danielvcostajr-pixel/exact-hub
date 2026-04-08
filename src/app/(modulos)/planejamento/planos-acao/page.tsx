@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, ListChecks, ChevronDown, ChevronUp, Link2, Users, Loader2, CheckCircle2, Circle } from 'lucide-react'
+import { Plus, ListChecks, ChevronDown, ChevronUp, Link2, Users, Loader2, CheckCircle2, Circle, Trash2 } from 'lucide-react'
 import { useClienteContext } from '@/hooks/useClienteContext'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { MatrizRACI, type AcaoRaci, type UsuarioRaci } from '@/components/planejamento/MatrizRACI'
-import { getPlanosAcaoByEmpresa, createPlanoAcao, createAcao, updateAcao, getUsuarios, getOKRsByEmpresa, createTarefa, getCurrentUserId } from '@/lib/api/data-service'
+import { getPlanosAcaoByEmpresa, createPlanoAcao, createAcao, updateAcao, deletePlanoAcao, getUsuarios, getOKRsByEmpresa, createTarefa, getCurrentUserId } from '@/lib/api/data-service'
 
 type StatusAcao = 'Pendente' | 'Em Andamento' | 'Concluida' | 'Bloqueada'
 
@@ -594,7 +594,24 @@ export default function PlanosAcaoPage() {
           {/* Plans list */}
           <div className="flex flex-col gap-3">
             {planos.map((plano) => (
-              <PlanoCard key={plano.id} plano={plano} usuarios={usuarios} empresaId={clienteAtivo!.id} onReload={loadData} />
+              <div key={plano.id} className="relative group">
+                <PlanoCard plano={plano} usuarios={usuarios} empresaId={clienteAtivo!.id} onReload={loadData} />
+                <button
+                  onClick={async () => {
+                    if (!confirm('Tem certeza que deseja excluir este plano de acao e todas as suas acoes?')) return
+                    try {
+                      await deletePlanoAcao(plano.id)
+                      await loadData()
+                    } catch {
+                      alert('Erro ao excluir plano de acao.')
+                    }
+                  }}
+                  className="absolute top-3 right-3 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity bg-red-500/10 hover:bg-red-500/20 text-red-500 z-10"
+                  title="Excluir Plano de Acao"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
             ))}
             {planos.length === 0 && (
               <div className="flex flex-col items-center justify-center py-16 gap-4">

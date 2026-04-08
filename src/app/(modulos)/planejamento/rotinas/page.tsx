@@ -14,7 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { RotinaCard, type Rotina } from '@/components/planejamento/RotinaCard'
 import { ROTINAS_TEMPLATES, type RotinaTemplate } from '@/lib/templates/rotinas'
-import { getRotinasByEmpresa, createRotina, createItemControle, getCurrentUserId } from '@/lib/api/data-service'
+import { getRotinasByEmpresa, createRotina, createItemControle, deleteRotina, getCurrentUserId } from '@/lib/api/data-service'
 
 const FREQ_COLORS: Record<string, string> = {
   DIARIA: 'bg-purple-500/15 text-purple-500 border-purple-500/30',
@@ -89,6 +89,17 @@ export default function RotinasPage() {
 
   function updateChecklistItem(index: number, field: 'descricao' | 'obrigatorio', value: string | boolean) {
     setFormItens((prev) => prev.map((it, i) => (i === index ? { ...it, [field]: value } : it)))
+  }
+
+  async function handleDeleteRotina(rotinaId: string) {
+    if (!confirm('Tem certeza que deseja excluir esta rotina e todo o seu historico?')) return
+    try {
+      await deleteRotina(rotinaId)
+      setRotinas((prev) => prev.filter((r) => r.id !== rotinaId))
+    } catch (err) {
+      console.error('Erro ao excluir rotina:', err)
+      alert('Erro ao excluir rotina.')
+    }
   }
 
   const loadRotinas = useCallback(async () => {
@@ -267,11 +278,19 @@ export default function RotinasPage() {
           <TabsContent value="minhas" className="mt-4">
             <div className="flex flex-col gap-3">
               {rotinas.map((rotina) => (
-                <RotinaCard
-                  key={rotina.id}
-                  rotina={rotina}
-                  onFinalizar={handleFinalizar}
-                />
+                <div key={rotina.id} className="relative group">
+                  <RotinaCard
+                    rotina={rotina}
+                    onFinalizar={handleFinalizar}
+                  />
+                  <button
+                    onClick={() => handleDeleteRotina(rotina.id)}
+                    className="absolute top-3 right-3 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity bg-red-500/10 hover:bg-red-500/20 text-red-500 z-10"
+                    title="Excluir Rotina"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               ))}
               {rotinas.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border rounded-xl">

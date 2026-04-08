@@ -183,6 +183,15 @@ export async function updateKeyResult(krId: string, updates: Record<string, unkn
   return data
 }
 
+export async function deleteOKR(okrId: string) {
+  const supabase = createClient()
+  // Limpar PlanoAcao vinculados (não tem cascade no schema)
+  await supabase.from('PlanoAcao').delete().eq('okrId', okrId)
+  // KeyResult tem cascade, será deletado automaticamente
+  const { error } = await supabase.from('OKR').delete().eq('id', okrId)
+  if (error) throw error
+}
+
 // ── Tarefas ──────────────────────────────────────────────────────────────────
 
 export async function getTarefasByEmpresa(empresaId: string) {
@@ -255,6 +264,13 @@ export async function updateRotina(rotinaId: string, updates: Record<string, unk
   const { data, error } = await supabase.from('Rotina').update({ ...updates }).eq('id', rotinaId).select().single()
   if (error) throw error
   return data
+}
+
+export async function deleteRotina(rotinaId: string) {
+  const supabase = createClient()
+  // ItemControle e ExecucaoItemControle têm cascade no schema
+  const { error } = await supabase.from('Rotina').delete().eq('id', rotinaId)
+  if (error) throw error
 }
 
 export async function createItemControle(params: {
@@ -340,6 +356,13 @@ export async function createPlanoAcao(params: {
   }).select().single()
   if (error) throw error
   return data
+}
+
+export async function deletePlanoAcao(planoId: string) {
+  const supabase = createClient()
+  // Acao e PapelAcaoRACI têm cascade no schema
+  const { error } = await supabase.from('PlanoAcao').delete().eq('id', planoId)
+  if (error) throw error
 }
 
 export async function createAcao(params: {

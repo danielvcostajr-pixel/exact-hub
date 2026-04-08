@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Target, Loader2 } from 'lucide-react'
+import { Plus, Target, Loader2, Trash2 } from 'lucide-react'
 import { useClienteContext } from '@/hooks/useClienteContext'
-import { getOKRsByEmpresa, createOKR, createKeyResult, updateKeyResult, getCurrentUserId } from '@/lib/api/data-service'
+import { getOKRsByEmpresa, createOKR, createKeyResult, updateKeyResult, deleteOKR, getCurrentUserId } from '@/lib/api/data-service'
 import { Button } from '@/components/ui/button'
 import { OKRCard, type OKR, type OKRStatus } from '@/components/planejamento/OKRCard'
 import { FormOKR, type OKRFormData } from '@/components/planejamento/FormOKR'
@@ -106,6 +106,17 @@ export default function OKRsPage() {
       await updateKeyResult(krId, { valorAtual: novoValor })
     } catch (err) {
       console.error('Erro ao atualizar KR:', err)
+    }
+  }
+
+  async function handleDeleteOKR(okrId: string) {
+    if (!confirm('Tem certeza que deseja excluir este OKR e todos os seus Key Results?')) return
+    try {
+      await deleteOKR(okrId)
+      setOkrs((prev) => prev.filter((o) => o.id !== okrId))
+    } catch (err) {
+      console.error('Erro ao excluir OKR:', err)
+      alert('Erro ao excluir OKR.')
     }
   }
 
@@ -221,7 +232,16 @@ export default function OKRsPage() {
       {/* OKR List */}
       <div className="flex flex-col gap-3">
         {sortedOkrs.map((okr) => (
-          <OKRCard key={okr.id} okr={okr} empresaId={clienteAtivo!.id} onUpdateKRValor={handleUpdateKR} />
+          <div key={okr.id} className="relative group">
+            <OKRCard okr={okr} empresaId={clienteAtivo!.id} onUpdateKRValor={handleUpdateKR} />
+            <button
+              onClick={() => handleDeleteOKR(okr.id)}
+              className="absolute top-3 right-3 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity bg-red-500/10 hover:bg-red-500/20 text-red-500"
+              title="Excluir OKR"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
         ))}
         {okrs.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 gap-4">
