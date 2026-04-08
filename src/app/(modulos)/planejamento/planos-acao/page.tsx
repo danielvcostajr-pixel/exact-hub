@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
-import { Plus, ListChecks, ChevronDown, ChevronUp, Link2, Users, ArrowLeft, Loader2, CheckCircle2, Circle } from 'lucide-react'
+import { Plus, ListChecks, ChevronDown, ChevronUp, Link2, Users, Loader2, CheckCircle2, Circle } from 'lucide-react'
 import { useClienteContext } from '@/hooks/useClienteContext'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -544,13 +543,6 @@ export default function PlanosAcaoPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-3">
-        <Link href="/consultor" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft size={16} />
-          Voltar
-        </Link>
-        {clienteAtivo && <span className="text-sm text-primary font-medium">{clienteAtivo.nome}</span>}
-      </div>
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
