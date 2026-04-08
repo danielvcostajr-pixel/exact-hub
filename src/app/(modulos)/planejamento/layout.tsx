@@ -29,29 +29,31 @@ export default function PlanejamentoLayout({ children }: { children: React.React
   return (
     <DashboardLayout>
       <div className="flex flex-col gap-0 h-full">
-        {/* Sub-navigation */}
-        <nav className="flex items-center gap-1 border-b border-border mb-6 overflow-x-auto">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-            const isActive = pathname.startsWith(href)
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`
-                  flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap
-                  ${
-                    isActive
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-                  }
-                `}
-              >
-                <Icon size={15} />
-                {label}
-              </Link>
-            )
-          })}
-        </nav>
+        {/* Sub-navigation tabs */}
+        <div className="w-full border-b border-border mb-6">
+          <nav className="flex items-center gap-1">
+            {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+              const isActive = pathname.startsWith(href)
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`
+                    inline-flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap
+                    ${
+                      isActive
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                    }
+                  `}
+                >
+                  <Icon size={15} />
+                  {label}
+                </Link>
+              )
+            })}
+          </nav>
+        </div>
 
         {/* Page content */}
         <div className="flex-1">{children}</div>
