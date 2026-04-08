@@ -138,8 +138,9 @@ export function gerarGradeRecebimentos(params: {
     taxaDesconto,
   } = condicoesRecebimento
 
-  // Buffer de 18 posições para recebimentos que podem cair além do mês 11
-  const buffer = new Array(18).fill(0)
+  // Buffer circular de 12 posições — recebíveis que caem além do mês 11
+  // voltam ao início do ciclo (projeção rolling de 12 meses)
+  const buffer = new Array(12).fill(0)
 
   const fracAVista = percentualAVista / 100
   const fracAPrazo = percentualAPrazo / 100
@@ -161,43 +162,31 @@ export function gerarGradeRecebimentos(params: {
       const valorPorParcela = valorTotal / qtdParcelas
 
       if (antecipaRecebiveis && percentualAntecipacao > 0) {
-        // Antecipação: traz todas as parcelas futuras para o mês atual
-        // aplicando desconto sobre o valor antecipado
         const fracAntecipa = percentualAntecipacao / 100
         const desconto = taxaDesconto / 100
 
-        // Parcelas que seriam recebidas nos meses m+1..m+qtdParcelas-1 são antecipadas
-        // A parcela do próprio mês (m) entra normalmente sem desconto
-        // As demais (antecipadas) entram com o fator de desconto
         for (let p = 0; p < qtdParcelas; p++) {
-          const mesParcela = m + p
+          const mesParcela = (m + p) % 12
           if (p === 0) {
-            // Primeira parcela: já cai no mês corrente, não há antecipação
             buffer[mesParcela] += valorPorParcela
           } else {
-            // Parcelas futuras: fracAntecipa é antecipada com desconto, resto no vencimento
             const antecipado = valorPorParcela * fracAntecipa * (1 - desconto)
             const naoAntecipado = valorPorParcela * (1 - fracAntecipa)
-            buffer[m] += antecipado           // antecipado cai no mês da venda
-            if (mesParcela < 18) {
-              buffer[mesParcela] += naoAntecipado
-            }
+            buffer[m] += antecipado
+            buffer[mesParcela] += naoAntecipado
           }
         }
       } else {
-        // Sem antecipação: cada parcela cai no mês correspondente
+        // Sem antecipação: cada parcela cai no mês correspondente (circular)
         for (let p = 0; p < qtdParcelas; p++) {
-          const mesParcela = m + p
-          if (mesParcela < 18) {
-            buffer[mesParcela] += valorPorParcela
-          }
+          const mesParcela = (m + p) % 12
+          buffer[mesParcela] += valorPorParcela
         }
       }
     }
   }
 
-  // Retorna apenas os 12 meses do período projetado
-  return buffer.slice(0, 12)
+  return buffer
 }
 
 // ============================================
@@ -212,7 +201,8 @@ export function gerarGradePagamentos(params: {
   const { comprasMensais, condicoesPagamento } = params
   const { percentualAVista, percentualAPrazo, distribuicaoParcelas } = condicoesPagamento
 
-  const buffer = new Array(18).fill(0)
+  // Buffer circular de 12 posições (projeção rolling de 12 meses)
+  const buffer = new Array(12).fill(0)
 
   const fracAVista = percentualAVista / 100
   const fracAPrazo = percentualAPrazo / 100
@@ -223,7 +213,7 @@ export function gerarGradePagamentos(params: {
     // À vista: paga no mesmo mês
     buffer[m] += compra * fracAVista
 
-    // A prazo: distribui conforme distribuicaoParcelas
+    // A prazo: distribui conforme distribuicaoParcelas (circular)
     const comprasAPrazo = compra * fracAPrazo
 
     for (const config of distribuicaoParcelas) {
@@ -234,15 +224,13 @@ export function gerarGradePagamentos(params: {
       const valorPorParcela = valorTotal / qtdParcelas
 
       for (let p = 0; p < qtdParcelas; p++) {
-        const mesPagamento = m + p
-        if (mesPagamento < 18) {
-          buffer[mesPagamento] += valorPorParcela
-        }
+        const mesPagamento = (m + p) % 12
+        buffer[mesPagamento] += valorPorParcela
       }
     }
   }
 
-  return buffer.slice(0, 12)
+  return buffer
 }
 
 // ============================================

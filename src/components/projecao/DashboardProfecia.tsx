@@ -140,16 +140,26 @@ export function DashboardProfecia({ resultado, kpis, faturamento, mesInicial = 0
   const mcPercValidos = kpis.margemContribuicaoPerc.filter(v => v !== 0)
   const mcMedio = mcPercValidos.length > 0 ? mcPercValidos.reduce((a, b) => a + b, 0) / mcPercValidos.length : 0
 
-  // Rotacionar arrays de resultado para alinhar com labels
-  const saldoFinalR = rotateArray([...resultado.saldoFinal], mesInicial)
-  const geracaoAcumuladaR = rotateArray([...resultado.geracaoAcumulada], mesInicial)
+  // Rotacionar TODOS os arrays e derivar cumulativos de forma consistente
+  const totalEntradasR = rotateArray([...resultado.totalEntradas], mesInicial)
+  const totalSaidasR = rotateArray([...resultado.totalSaidas], mesInicial)
+  // Derivar geracaoCaixa DIRETAMENTE de totalEntradas - totalSaidas para garantir consistencia
+  const geracaoCaixaR = totalEntradasR.map((v, i) => v - totalSaidasR[i])
+  const userSaldoInicial = resultado.saldoInicial[0] // saldo informado pelo usuario
 
-  // Debug temporario
-  if (mesInicial > 0) {
-    console.log('[Dashboard Debug] mesInicial:', mesInicial)
-    console.log('[Dashboard Debug] faturamento original [0..3]:', faturamento.slice(0, 4))
-    console.log('[Dashboard Debug] saldoFinal original [0..3]:', resultado.saldoFinal.slice(0, 4))
-    console.log('[Dashboard Debug] saldoFinal rotated [0..3]:', saldoFinalR.slice(0, 4))
+  // Recalcular saldoInicial, saldoFinal e geracaoAcumulada a partir do saldo do usuario
+  const saldoInicialR: number[] = new Array(12)
+  const saldoFinalR: number[] = new Array(12)
+  const geracaoAcumuladaR: number[] = new Array(12)
+
+  saldoInicialR[0] = userSaldoInicial
+  saldoFinalR[0] = userSaldoInicial + geracaoCaixaR[0]
+  geracaoAcumuladaR[0] = geracaoCaixaR[0]
+
+  for (let i = 1; i < 12; i++) {
+    saldoInicialR[i] = saldoFinalR[i - 1]
+    saldoFinalR[i] = saldoInicialR[i] + geracaoCaixaR[i]
+    geracaoAcumuladaR[i] = geracaoAcumuladaR[i - 1] + geracaoCaixaR[i]
   }
 
   // Chart data
@@ -159,13 +169,37 @@ export function DashboardProfecia({ resultado, kpis, faturamento, mesInicial = 0
     geracaoAcumulada: Math.round(geracaoAcumuladaR[i] ?? 0),
   }))
 
-  // Profecia table rows — rotacionar valores de cada linha
+  // Profecia table rows — rotacionar operacionais, recalcular cumulativos
   const linhasRaw = gerarLinhasProfecia(resultado)
-  const linhas = linhasRaw.map(l => ({
-    ...l,
-    valores: rotateArray(l.valores, mesInicial),
-    total: l.valores.reduce((a: number, b: number) => a + b, 0),
-  }))
+
+  // Primeiro rotaciona todas as linhas normais
+  const linhasRotacionadas = linhasRaw.map(l => {
+    const rotated = rotateArray([...l.valores], mesInicial)
+    return { ...l, valores: rotated, total: rotated.reduce((a: number, b: number) => a + b, 0) }
+  })
+
+  // Depois substitui as linhas de totalização para garantir consistencia
+  const linhas = linhasRotacionadas.map(l => {
+    if (l.label === '(=) TOTAL ENTRADAS') {
+      return { ...l, valores: totalEntradasR, total: totalEntradasR.reduce((a, b) => a + b, 0) }
+    }
+    if (l.label === '(=) TOTAL SAIDAS') {
+      return { ...l, valores: totalSaidasR, total: totalSaidasR.reduce((a, b) => a + b, 0) }
+    }
+    if (l.label === 'GERACAO DE CAIXA') {
+      return { ...l, valores: geracaoCaixaR, total: geracaoCaixaR.reduce((a, b) => a + b, 0) }
+    }
+    if (l.label === 'SALDO INICIAL') {
+      return { ...l, valores: saldoInicialR, total: userSaldoInicial }
+    }
+    if (l.label === 'SALDO FINAL') {
+      return { ...l, valores: saldoFinalR, total: saldoFinalR[11] }
+    }
+    if (l.label === 'GERACAO ACUMULADA') {
+      return { ...l, valores: geracaoAcumuladaR, total: geracaoAcumuladaR[11] }
+    }
+    return l
+  })
 
   return (
     <div className="space-y-6">

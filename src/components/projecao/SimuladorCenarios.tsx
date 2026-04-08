@@ -214,9 +214,21 @@ export function SimuladorCenarios({
     return { resultado, kpis, fatModificado }
   }, [cmvPerc, aVistaRec, aVistaPag, ajusteFixos, ajusteFin, taxaCrescimento, dadosBase, faturamento])
 
-  // Build chart data — rotacionar para alinhar com labels
-  const saldoSimR = rotateArray(simulacao.resultado.saldoFinal, mesInicial)
-  const saldoBaseR = rotateArray(resultadoBase.saldoFinal, mesInicial)
+  // Build chart data — derivar geracaoCaixa de totalEntradas - totalSaidas e recalcular saldo
+  function recalcSaldo(resultado: ResultadoProfecia): number[] {
+    const teR = rotateArray([...resultado.totalEntradas], mesInicial)
+    const tsR = rotateArray([...resultado.totalSaidas], mesInicial)
+    const gcR = teR.map((v, i) => v - tsR[i])
+    const userSaldo = resultado.saldoInicial[0]
+    const saldo: number[] = new Array(12)
+    saldo[0] = userSaldo + gcR[0]
+    for (let i = 1; i < 12; i++) {
+      saldo[i] = saldo[i - 1] + gcR[i]
+    }
+    return saldo
+  }
+  const saldoSimR = recalcSaldo(simulacao.resultado)
+  const saldoBaseR = recalcSaldo(resultadoBase)
   const chartData = mesesLabels.map((mes, i) => ({
     mes,
     saldoSimulado: saldoSimR[i],
