@@ -178,6 +178,7 @@ model ProjecaoFinanceira {
   empresa               Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   nome                  String   @default("Projecao Principal")
   anoBase               Int
+  dados                 Json?
   crescimentoOtimista   Float    @default(20)
   crescimentoRealista   Float    @default(0)
   crescimentoPessimista Float    @default(-20)

@@ -55,6 +55,15 @@ export function indiceMesCalendario(indiceProjecao: number, mesInicial: number):
   return (mesInicial + indiceProjecao) % 12
 }
 
+/**
+ * Rotaciona um array de 12 elementos para começar do mesInicial.
+ * Ex: rotateArray([jan,fev,mar,...,dez], 2) → [mar,abr,...,dez,jan,fev]
+ */
+export function rotateArray<T>(arr: T[], mesInicial: number): T[] {
+  if (!arr || arr.length !== 12 || mesInicial === 0) return arr
+  return [...arr.slice(mesInicial), ...arr.slice(0, mesInicial)]
+}
+
 // ============================================
 // Helpers internos
 // ============================================

@@ -6,6 +6,7 @@ import {
   formatarPercentual,
   MESES,
   getMesesReordenados,
+  rotateArray,
   gerarLinhasProfecia,
 } from '@/lib/calculations/financeiro'
 import {
@@ -139,15 +140,24 @@ export function DashboardProfecia({ resultado, kpis, faturamento, mesInicial = 0
   const mcPercValidos = kpis.margemContribuicaoPerc.filter(v => v !== 0)
   const mcMedio = mcPercValidos.length > 0 ? mcPercValidos.reduce((a, b) => a + b, 0) / mcPercValidos.length : 0
 
+  // Rotacionar arrays de resultado para alinhar com labels
+  const saldoFinalR = rotateArray(resultado.saldoFinal, mesInicial)
+  const geracaoAcumuladaR = rotateArray(resultado.geracaoAcumulada, mesInicial)
+
   // Chart data
   const chartData = mesesLabels.map((mes, i) => ({
     mes,
-    saldoFinal: Math.round(resultado.saldoFinal[i] ?? 0),
-    geracaoAcumulada: Math.round(resultado.geracaoAcumulada[i] ?? 0),
+    saldoFinal: Math.round(saldoFinalR[i] ?? 0),
+    geracaoAcumulada: Math.round(geracaoAcumuladaR[i] ?? 0),
   }))
 
-  // Profecia table rows
-  const linhas = gerarLinhasProfecia(resultado)
+  // Profecia table rows — rotacionar valores de cada linha
+  const linhasRaw = gerarLinhasProfecia(resultado)
+  const linhas = linhasRaw.map(l => ({
+    ...l,
+    valores: rotateArray(l.valores, mesInicial),
+    total: l.valores.reduce((a: number, b: number) => a + b, 0),
+  }))
 
   return (
     <div className="space-y-6">
@@ -162,12 +172,12 @@ export function DashboardProfecia({ resultado, kpis, faturamento, mesInicial = 0
           subtitle="12 meses acumulado"
         />
         <KPICard
-          label="Saldo Final"
+          label={`Saldo Final (${mesesLabels[11]})`}
           value={formatarMoeda(saldoFinalUltimo)}
           icon={<DollarSign size={16} />}
           positive={saldoFinalUltimo > 0}
           negative={saldoFinalUltimo < 0}
-          subtitle="Dez — projecao"
+          subtitle={`${mesesLabels[11]} — projecao`}
         />
         <KPICard
           label="Exposicao Maxima do Caixa"

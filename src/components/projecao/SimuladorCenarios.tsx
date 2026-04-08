@@ -11,6 +11,7 @@ import {
   formatarPercentual,
   MESES,
   getMesesReordenados,
+  rotateArray,
   gerarResultadoProfecia,
   calcularKPIs,
 } from '@/lib/calculations/financeiro'
@@ -213,11 +214,13 @@ export function SimuladorCenarios({
     return { resultado, kpis, fatModificado }
   }, [cmvPerc, aVistaRec, aVistaPag, ajusteFixos, ajusteFin, taxaCrescimento, dadosBase, faturamento])
 
-  // Build chart data
+  // Build chart data — rotacionar para alinhar com labels
+  const saldoSimR = rotateArray(simulacao.resultado.saldoFinal, mesInicial)
+  const saldoBaseR = rotateArray(resultadoBase.saldoFinal, mesInicial)
   const chartData = mesesLabels.map((mes, i) => ({
     mes,
-    saldoSimulado: simulacao.resultado.saldoFinal[i],
-    saldoBase: resultadoBase.saldoFinal[i],
+    saldoSimulado: saldoSimR[i],
+    saldoBase: saldoBaseR[i],
   }))
 
   // Summary KPIs
