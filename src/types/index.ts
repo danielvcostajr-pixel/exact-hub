@@ -165,6 +165,7 @@ export interface ProjecaoFinanceiraCompleta {
   empresaId: string
   nome: string
   anoBase: number
+  mesInicial: number    // 0-11 (mês de início da projeção, 0 = Janeiro)
   saldoInicial: number
   premissasVendas: PremissasVendas
   condicoesRecebimento: CondicoesRecebimento

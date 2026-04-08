@@ -58,6 +58,7 @@ const ESTADO_INICIAL: ProjecaoFinanceiraCompleta = {
   empresaId: '',
   nome: '',
   anoBase: ANO_BASE_DEFAULT + 1,
+  mesInicial: 0,
   saldoInicial: 0,
 
   premissasVendas: {
@@ -325,17 +326,19 @@ export default function ProjecaoFinanceiraPage() {
             resultado={resultados.resultado}
             kpis={resultados.kpis}
             faturamento={resultados.faturamento}
+            mesInicial={dados.mesInicial ?? 0}
           />
         )
       }
       if (activeResultTab === 'dre') {
-        return <DREProjetado linhas={resultados.dreLinhas} />
+        return <DREProjetado linhas={resultados.dreLinhas} mesInicial={dados.mesInicial ?? 0} />
       }
       if (activeResultTab === 'cenarios') {
         return (
           <ComparativoCenarios
             projecoes={resultados.projecoes}
             cenarioAtivo={dados.premissasVendas.cenarios.ativo}
+            mesInicial={dados.mesInicial ?? 0}
           />
         )
       }
@@ -345,6 +348,7 @@ export default function ProjecaoFinanceiraPage() {
             dadosBase={dados}
             resultadoBase={resultados.resultado}
             kpisBase={resultados.kpis}
+            mesInicial={dados.mesInicial ?? 0}
             faturamento={resultados.faturamento}
           />
         )
@@ -358,6 +362,7 @@ export default function ProjecaoFinanceiraPage() {
           onChange={(p) => setDados((d) => ({ ...d, premissasVendas: p }))}
           anoBase={anoBase}
           onAnoBaseChange={setAnoBase}
+          mesInicial={dados.mesInicial ?? 0}
         />
       )
     }
@@ -531,16 +536,32 @@ export default function ProjecaoFinanceiraPage() {
           Modelo PROFECIA — {clienteAtivo?.nome ?? 'Cliente'} · {anoProjecao}
         </p>
 
-        {/* Saldo Inicial de Caixa */}
-        <div className="mt-3 flex items-center gap-3">
-          <label className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-            Saldo Inicial de Caixa
-          </label>
-          <CurrencyInput
-            value={dados.saldoInicial}
-            onChange={(v) => setDados((d) => ({ ...d, saldoInicial: v }))}
-            className="w-44 bg-card"
-          />
+        {/* Saldo Inicial + Mês Inicial */}
+        <div className="mt-3 flex items-center gap-6 flex-wrap">
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+              Saldo Inicial de Caixa
+            </label>
+            <CurrencyInput
+              value={dados.saldoInicial}
+              onChange={(v) => setDados((d) => ({ ...d, saldoInicial: v }))}
+              className="w-44 bg-card"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+              Mês Inicial
+            </label>
+            <select
+              value={dados.mesInicial ?? 0}
+              onChange={(e) => setDados((d) => ({ ...d, mesInicial: Number(e.target.value) }))}
+              className="h-8 px-3 rounded-md border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+            >
+              {['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'].map((m, i) => (
+                <option key={i} value={i}>{m}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 

@@ -34,6 +34,27 @@ export const MESES = [
   'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez',
 ]
 
+export const MESES_FULL = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+]
+
+/**
+ * Retorna os labels de meses reordenados a partir do mês inicial.
+ * Ex: mesInicial=2 (Março) → ['Mar','Abr','Mai',...,'Jan','Fev']
+ */
+export function getMesesReordenados(mesInicial: number, full = false): string[] {
+  const base = full ? MESES_FULL : MESES
+  return Array.from({ length: 12 }, (_, i) => base[(mesInicial + i) % 12])
+}
+
+/**
+ * Converte índice da projeção (0-11) para índice de mês calendário (0-11)
+ */
+export function indiceMesCalendario(indiceProjecao: number, mesInicial: number): number {
+  return (mesInicial + indiceProjecao) % 12
+}
+
 // ============================================
 // Helpers internos
 // ============================================

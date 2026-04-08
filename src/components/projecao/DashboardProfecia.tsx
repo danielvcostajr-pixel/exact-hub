@@ -5,6 +5,7 @@ import {
   formatarMoeda,
   formatarPercentual,
   MESES,
+  getMesesReordenados,
   gerarLinhasProfecia,
 } from '@/lib/calculations/financeiro'
 import {
@@ -25,6 +26,7 @@ interface DashboardProfeciaProps {
   resultado: ResultadoProfecia
   kpis: KPIsProfecia
   faturamento: number[]
+  mesInicial?: number
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -124,7 +126,8 @@ function corValorProfecia(tipo: string, valor: number): string {
 // ── Main component ────────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function DashboardProfecia({ resultado, kpis, faturamento }: DashboardProfeciaProps) {
+export function DashboardProfecia({ resultado, kpis, faturamento, mesInicial = 0 }: DashboardProfeciaProps) {
+  const mesesLabels = getMesesReordenados(mesInicial)
   // KPI calculations
   const geracaoCaixaTotal = resultado.geracaoCaixa.reduce((a, b) => a + b, 0)
   const saldoFinalUltimo = resultado.saldoFinal[11] ?? 0
@@ -137,7 +140,7 @@ export function DashboardProfecia({ resultado, kpis, faturamento }: DashboardPro
   const mcMedio = mcPercValidos.length > 0 ? mcPercValidos.reduce((a, b) => a + b, 0) / mcPercValidos.length : 0
 
   // Chart data
-  const chartData = MESES.map((mes, i) => ({
+  const chartData = mesesLabels.map((mes, i) => ({
     mes,
     saldoFinal: Math.round(resultado.saldoFinal[i] ?? 0),
     geracaoAcumulada: Math.round(resultado.geracaoAcumulada[i] ?? 0),
@@ -264,7 +267,7 @@ export function DashboardProfecia({ resultado, kpis, faturamento }: DashboardPro
                   <th className="text-left px-4 py-3 text-muted-foreground font-medium sticky left-0 bg-card min-w-[240px] z-10">
                     Descricao
                   </th>
-                  {MESES.map((mes) => (
+                  {mesesLabels.map((mes) => (
                     <th key={mes} className="text-right px-3 py-3 text-muted-foreground font-medium font-numbers min-w-[88px]">
                       {mes}
                     </th>

@@ -1,11 +1,12 @@
 'use client'
 
 import type { LinhaDRE } from '@/types'
-import { formatarMoeda, MESES } from '@/lib/calculations/financeiro'
+import { formatarMoeda, MESES, getMesesReordenados } from '@/lib/calculations/financeiro'
 // scroll-area removed — using native overflow-x-auto
 
 interface DREProjetadoProps {
   linhas: LinhaDRE[]
+  mesInicial?: number
 }
 
 function isPercentRow(label: string): boolean {
@@ -41,7 +42,8 @@ function corTotalDRE(linha: LinhaDRE, total: number): string {
   return corValorDRE(linha, total)
 }
 
-export function DREProjetado({ linhas }: DREProjetadoProps) {
+export function DREProjetado({ linhas, mesInicial = 0 }: DREProjetadoProps) {
+  const mesesLabels = getMesesReordenados(mesInicial)
   if (!linhas || linhas.length === 0) {
     return (
       <div className="flex items-center justify-center h-48 bg-card border border-border rounded-xl">
@@ -66,7 +68,7 @@ export function DREProjetado({ linhas }: DREProjetadoProps) {
                 <th className="text-left px-4 py-3 text-muted-foreground font-medium sticky left-0 bg-card min-w-[220px] z-10">
                   Descricao
                 </th>
-                {MESES.map((mes) => (
+                {mesesLabels.map((mes) => (
                   <th
                     key={mes}
                     className="text-right px-3 py-3 text-muted-foreground font-medium font-numbers min-w-[88px]"

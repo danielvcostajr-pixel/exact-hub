@@ -10,6 +10,7 @@ import {
   formatarMoeda,
   formatarPercentual,
   MESES,
+  getMesesReordenados,
   gerarResultadoProfecia,
   calcularKPIs,
 } from '@/lib/calculations/financeiro'
@@ -37,6 +38,7 @@ interface SimuladorCenariosProps {
   resultadoBase: ResultadoProfecia
   kpisBase: KPIsProfecia
   faturamento: number[]
+  mesInicial?: number
 }
 
 interface SliderConfig {
@@ -125,7 +127,9 @@ export function SimuladorCenarios({
   resultadoBase,
   kpisBase,
   faturamento,
+  mesInicial = 0,
 }: SimuladorCenariosProps) {
+  const mesesLabels = getMesesReordenados(mesInicial)
   // Extract default values from current data
   const defaultCMV = dadosBase.despesas.variaveis
     .filter(g => g.categoria === 'cmv')
@@ -210,7 +214,7 @@ export function SimuladorCenarios({
   }, [cmvPerc, aVistaRec, aVistaPag, ajusteFixos, ajusteFin, taxaCrescimento, dadosBase, faturamento])
 
   // Build chart data
-  const chartData = MESES.map((mes, i) => ({
+  const chartData = mesesLabels.map((mes, i) => ({
     mes,
     saldoSimulado: simulacao.resultado.saldoFinal[i],
     saldoBase: resultadoBase.saldoFinal[i],

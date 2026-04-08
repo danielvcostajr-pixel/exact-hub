@@ -9,7 +9,9 @@ import { Separator } from '@/components/ui/separator'
 import type { PremissasVendas, HistoricoFaturamento, CenarioTipo } from '@/types'
 import { TrendingUp, Calendar, Target } from 'lucide-react'
 
-const MESES = [
+import { getMesesReordenados } from '@/lib/calculations/financeiro'
+
+const MESES_BASE = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
 ]
@@ -26,9 +28,11 @@ interface Props {
   onChange: (p: PremissasVendas) => void
   anoBase: number
   onAnoBaseChange: (ano: number) => void
+  mesInicial?: number
 }
 
-export default function EtapaVendas({ premissas, onChange, anoBase, onAnoBaseChange }: Props) {
+export default function EtapaVendas({ premissas, onChange, anoBase, onAnoBaseChange, mesInicial = 0 }: Props) {
+  const mesesOrdenados = getMesesReordenados(mesInicial, true)
   const anosDisponiveis: number[] = []
   for (let a = 2020; a <= new Date().getFullYear() + 1; a++) {
     anosDisponiveis.push(a)
@@ -42,17 +46,23 @@ export default function EtapaVendas({ premissas, onChange, anoBase, onAnoBaseCha
     onChange({ ...premissas, historico: novoHistorico })
   }
 
-  function getHistoricoValor(mes: number): string {
-    const item = premissas.historico.find(h => h.mes === mes + 1)
+  // Converte índice da grid (0-11) para mês calendário (1-12)
+  function indicePraCalendario(i: number): number {
+    return ((mesInicial + i) % 12) + 1
+  }
+
+  function getHistoricoValor(gridIndex: number): string {
+    const mesCalendario = indicePraCalendario(gridIndex)
+    const item = premissas.historico.find(h => h.mes === mesCalendario)
     return item ? String(item.valor) : ''
   }
 
-  function handleHistoricoChange(mesIndex: number, raw: string) {
+  function handleHistoricoChange(gridIndex: number, raw: string) {
     const valor = parseFloat(raw.replace(',', '.')) || 0
-    const mes = mesIndex + 1
-    const novoHistorico: HistoricoFaturamento[] = premissas.historico.filter(h => h.mes !== mes)
+    const mesCalendario = indicePraCalendario(gridIndex)
+    const novoHistorico: HistoricoFaturamento[] = premissas.historico.filter(h => h.mes !== mesCalendario)
     if (raw !== '') {
-      novoHistorico.push({ mes, ano: anoBase, valor })
+      novoHistorico.push({ mes: mesCalendario, ano: anoBase, valor })
     }
     onChange({ ...premissas, historico: novoHistorico })
   }
@@ -107,7 +117,7 @@ export default function EtapaVendas({ premissas, onChange, anoBase, onAnoBaseCha
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {MESES.map((mes, i) => (
+            {mesesOrdenados.map((mes, i) => (
               <div key={i} className="space-y-1">
                 <Label className="text-xs font-medium text-muted-foreground">
                   {mes}
