@@ -45,10 +45,17 @@ function corTotalDRE(linha: LinhaDRE, total: number): string {
 export function DREProjetado({ linhas: linhasRaw, mesInicial = 0 }: DREProjetadoProps) {
   const mesesLabels = getMesesReordenados(mesInicial)
   // Rotacionar valores para alinhar com labels de meses
-  const linhas = linhasRaw?.map(l => ({
-    ...l,
-    valores: rotateArray(l.valores, mesInicial),
-  })) ?? []
+  const linhas = (linhasRaw ?? []).map(l => {
+    const rotated = rotateArray([...l.valores], mesInicial)
+    return { ...l, valores: rotated }
+  })
+
+  // Debug temporario — verificar no console do browser
+  if (linhasRaw && linhasRaw.length > 0 && mesInicial > 0) {
+    console.log('[DRE Debug] mesInicial:', mesInicial)
+    console.log('[DRE Debug] Receita Bruta original:', linhasRaw[0]?.valores?.slice(0, 4))
+    console.log('[DRE Debug] Receita Bruta rotated:', linhas[0]?.valores?.slice(0, 4))
+  }
   if (!linhas || linhas.length === 0) {
     return (
       <div className="flex items-center justify-center h-48 bg-card border border-border rounded-xl">

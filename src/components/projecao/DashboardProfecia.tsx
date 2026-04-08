@@ -141,8 +141,16 @@ export function DashboardProfecia({ resultado, kpis, faturamento, mesInicial = 0
   const mcMedio = mcPercValidos.length > 0 ? mcPercValidos.reduce((a, b) => a + b, 0) / mcPercValidos.length : 0
 
   // Rotacionar arrays de resultado para alinhar com labels
-  const saldoFinalR = rotateArray(resultado.saldoFinal, mesInicial)
-  const geracaoAcumuladaR = rotateArray(resultado.geracaoAcumulada, mesInicial)
+  const saldoFinalR = rotateArray([...resultado.saldoFinal], mesInicial)
+  const geracaoAcumuladaR = rotateArray([...resultado.geracaoAcumulada], mesInicial)
+
+  // Debug temporario
+  if (mesInicial > 0) {
+    console.log('[Dashboard Debug] mesInicial:', mesInicial)
+    console.log('[Dashboard Debug] faturamento original [0..3]:', faturamento.slice(0, 4))
+    console.log('[Dashboard Debug] saldoFinal original [0..3]:', resultado.saldoFinal.slice(0, 4))
+    console.log('[Dashboard Debug] saldoFinal rotated [0..3]:', saldoFinalR.slice(0, 4))
+  }
 
   // Chart data
   const chartData = mesesLabels.map((mes, i) => ({
