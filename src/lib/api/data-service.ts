@@ -826,3 +826,81 @@ export async function getSystemStats() {
     empresasAtivas: emps.filter(e => e.ativa).length,
   }
 }
+
+// ── Transcrições de Entrevistas (biblioteca persistida) ──────────────────────
+
+export type TranscricaoEntrevista = {
+  id: string
+  empresaId: string
+  respondente: string
+  cargo: string | null
+  area: string | null
+  nomeArquivo: string
+  textoExtraido: string
+  dataEntrevista: string | null
+  notas: string | null
+  analise: unknown
+  createdAt: string
+  updatedAt: string
+}
+
+export async function listarTranscricoesEntrevistas(empresaId: string) {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('TranscricaoEntrevista')
+    .select('*')
+    .eq('empresaId', empresaId)
+    .order('createdAt', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as TranscricaoEntrevista[]
+}
+
+export async function criarTranscricaoEntrevista(input: {
+  empresaId: string
+  respondente: string
+  cargo?: string
+  area?: string
+  nomeArquivo: string
+  textoExtraido: string
+  dataEntrevista?: string | null
+  notas?: string | null
+}) {
+  const supabase = createClient()
+  const userId = await getCurrentUserId()
+  const { data, error } = await supabase
+    .from('TranscricaoEntrevista')
+    .insert({
+      id: uuid(),
+      empresaId: input.empresaId,
+      respondente: input.respondente,
+      cargo: input.cargo ?? null,
+      area: input.area ?? null,
+      nomeArquivo: input.nomeArquivo,
+      textoExtraido: input.textoExtraido,
+      dataEntrevista: input.dataEntrevista ?? null,
+      notas: input.notas ?? null,
+      analise: null,
+      criadoPorId: userId,
+      createdAt: now(),
+      updatedAt: now(),
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return data as TranscricaoEntrevista
+}
+
+export async function deletarTranscricaoEntrevista(id: string) {
+  const supabase = createClient()
+  const { error } = await supabase.from('TranscricaoEntrevista').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function atualizarAnaliseTranscricao(id: string, analise: unknown) {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('TranscricaoEntrevista')
+    .update({ analise, updatedAt: now() })
+    .eq('id', id)
+  if (error) throw error
+}

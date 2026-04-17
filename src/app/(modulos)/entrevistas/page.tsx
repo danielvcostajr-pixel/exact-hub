@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { FormQuestionario } from '@/components/entrevistas/FormQuestionario'
 import { RespostaCard } from '@/components/entrevistas/RespostaCard'
 import { AnalisePareto } from '@/components/entrevistas/AnalisePareto'
-import { UploadTranscricoes } from '@/components/entrevistas/UploadTranscricoes'
+import { BibliotecaTranscricoes } from '@/components/entrevistas/BibliotecaTranscricoes'
 import { Entrevista, RespostaEntrevista, StatusEntrevista, Pergunta } from '@/types'
 
 const STATUS_CONFIG: Record<StatusEntrevista, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
@@ -356,7 +356,7 @@ export default function EntrevistasPage() {
           </div>
           <div className="text-center">
             <h3 className="text-lg font-semibold text-foreground mb-1">Nenhuma entrevista realizada</h3>
-            <p className="text-sm text-muted-foreground max-w-md">Crie um questionário pela plataforma ou envie transcrições existentes (PDF/DOCX) para análise com IA.</p>
+            <p className="text-sm text-muted-foreground max-w-md">Crie um questionário pela plataforma ou suba PDF/DOCX das entrevistas já realizadas — elas ficam salvas na biblioteca para chat e análise depois.</p>
           </div>
           <div className="flex gap-2 flex-wrap justify-center">
             <Button onClick={() => setFormOpen(true)} className="gradient-exact text-white">
@@ -375,7 +375,7 @@ export default function EntrevistasPage() {
         </div>
         {activeTab === 'transcricoes' && (
           <div className="mt-4">
-            <UploadTranscricoes nomeEmpresa={clienteAtivo?.nome} />
+            <BibliotecaTranscricoes empresaId={clienteAtivo?.id ?? ''} nomeEmpresa={clienteAtivo?.nome} />
           </div>
         )}
         <FormQuestionario
@@ -447,7 +447,7 @@ export default function EntrevistasPage() {
             className="data-[state=active]:bg-primary data-[state=active]:text-white text-muted-foreground gap-1.5"
           >
             <Sparkles size={13} />
-            Transcrições
+            Biblioteca
           </TabsTrigger>
         </TabsList>
 
@@ -621,7 +621,7 @@ export default function EntrevistasPage() {
 
         {/* Tab: Transcrições */}
         <TabsContent value="transcricoes" className="mt-4">
-          <UploadTranscricoes nomeEmpresa={clienteAtivo?.nome} />
+          <BibliotecaTranscricoes empresaId={clienteAtivo?.id ?? ''} nomeEmpresa={clienteAtivo?.nome} />
         </TabsContent>
 
       </Tabs>

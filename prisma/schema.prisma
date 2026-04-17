@@ -170,6 +170,7 @@ model Empresa {
   fechamentosMensais FechamentoMensal[]
   simuladores        Simulador[]
   quickWins          QuickWin[]
+  transcricoesEntrevistas TranscricaoEntrevista[]
 }
 
 model ProjecaoFinanceira {
@@ -306,6 +307,27 @@ model RespostaEntrevista {
   area         String?
   respostas    Json
   createdAt    DateTime   @default(now())
+}
+
+/// Transcricoes de entrevistas realizadas fora da plataforma (PDF/DOCX subidos pelo consultor).
+/// Servem como biblioteca persistida para chat e analise com IA sem precisar reupload.
+model TranscricaoEntrevista {
+  id             String   @id @default(uuid())
+  empresaId      String
+  empresa        Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  respondente    String
+  cargo          String?
+  area           String?
+  nomeArquivo    String
+  textoExtraido  String   @db.Text
+  dataEntrevista DateTime?
+  notas          String?  @db.Text
+  analise        Json?
+  criadoPorId    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([empresaId, createdAt])
 }
 
 model MemoriaCliente {
