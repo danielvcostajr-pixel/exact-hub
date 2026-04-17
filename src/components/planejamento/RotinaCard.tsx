@@ -139,7 +139,7 @@ export function RotinaCard({ rotina, onFinalizar }: RotinaCardProps) {
         }
 
         // Then: add execution days that are NOT expected (com atraso)
-        for (const dateStr of diasExecutados) {
+        for (const dateStr of Array.from(diasExecutados)) {
           if (!diasMap.has(dateStr)) {
             diasMap.set(dateStr, 'atrasada')
           }

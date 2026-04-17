@@ -134,6 +134,7 @@ model Usuario {
   simulacoesExecutadas   HistoricoSimulacao[]    @relation("SimulacaoExecutadaPor")
   execucoesItemControle  ExecucaoItemControle[]  @relation("ExecucaoExecutadaPor")
   papeisRaci             PapelAcaoRACI[]
+  timesheets             Timesheet[]             @relation("TimesheetUsuario")
 }
 
 model Empresa {
@@ -171,6 +172,7 @@ model Empresa {
   simuladores        Simulador[]
   quickWins          QuickWin[]
   transcricoesEntrevistas TranscricaoEntrevista[]
+  timesheets         Timesheet[]
 }
 
 model ProjecaoFinanceira {
@@ -328,6 +330,25 @@ model TranscricaoEntrevista {
   updatedAt      DateTime @updatedAt
 
   @@index([empresaId, createdAt])
+}
+
+/// Lancamentos de horas (timesheet) por consultor/cliente
+model Timesheet {
+  id              String   @id @default(uuid())
+  empresaId       String
+  empresa         Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  usuarioId       String
+  usuario         Usuario  @relation("TimesheetUsuario", fields: [usuarioId], references: [id])
+  data            DateTime
+  horaInicio      String?
+  horaFim         String?
+  duracaoMinutos  Int
+  descricao       String?
+  categoria       String?
+  createdAt       DateTime @default(now())
+
+  @@index([empresaId, data])
+  @@index([usuarioId, data])
 }
 
 model MemoriaCliente {

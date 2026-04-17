@@ -547,16 +547,16 @@ export async function getRelatoriosByEmpresa(empresaId: string) {
 
 export async function createRelatorio(params: {
   empresaId: string; semanaInicio: string; semanaFim: string; resumoExecutivo?: string
-  tarefasConcluidas?: string; tarefasEmAndamento?: string; problemas?: string
+  tarefasConcluidas?: unknown; tarefasEmAndamento?: unknown; problemas?: string
   proximaSemana?: string; kpis?: Record<string, unknown>; criadoPorId: string
 }) {
   const supabase = createClient()
   const nowIso = now()
   const { data, error } = await supabase.from('RelatorioSemanal').insert({
     id: uuid(), empresaId: params.empresaId, semanaInicio: params.semanaInicio,
-    semanaFim: params.semanaFim, resumoExecutivo: params.resumoExecutivo ?? null,
-    tarefasConcluidas: params.tarefasConcluidas ?? null,
-    tarefasEmAndamento: params.tarefasEmAndamento ?? null,
+    semanaFim: params.semanaFim, resumoExecutivo: params.resumoExecutivo ?? '',
+    tarefasConcluidas: params.tarefasConcluidas ?? [],
+    tarefasEmAndamento: params.tarefasEmAndamento ?? [],
     problemas: params.problemas ?? null, proximaSemana: params.proximaSemana ?? null,
     kpis: params.kpis ?? null, criadoPorId: params.criadoPorId,
     createdAt: nowIso, updatedAt: nowIso,
@@ -722,10 +722,11 @@ export async function saveMemoria(params: {
   const supabase = createClient()
   const existing = await getMemoriaByEmpresa(params.empresaId)
   const versao = existing ? existing.versao + 1 : 1
+  const nowIso = now()
   const { data, error } = await supabase.from('MemoriaCliente').insert({
     id: uuid(), empresaId: params.empresaId, conteudo: params.conteudo,
     versao, geradoPorId: params.geradoPorId,
-    createdAt: now(),
+    createdAt: nowIso, updatedAt: nowIso,
   }).select().single()
   if (error) throw error
   return data

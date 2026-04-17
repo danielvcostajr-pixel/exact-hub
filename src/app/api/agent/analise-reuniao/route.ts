@@ -67,8 +67,8 @@ async function extractTextFromFile(
     try {
       const { extractText } = await import('unpdf')
       const uint8 = new Uint8Array(buffer)
-      const { text } = await extractText(uint8)
-      return text
+      const { text } = await extractText(uint8, { mergePages: true })
+      return Array.isArray(text) ? text.join('\n') : text
     } catch (err) {
       console.error('Erro ao parsear PDF:', err)
       return ''
@@ -143,9 +143,9 @@ export async function POST(request: NextRequest) {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-5.4-nano',
+        model: 'gpt-4o-mini',
         temperature: 0.3,
-        max_completion_tokens: 8192,
+        max_tokens: 8192,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },

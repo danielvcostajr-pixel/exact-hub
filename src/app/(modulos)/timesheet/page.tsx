@@ -430,7 +430,7 @@ export default function TimesheetPage() {
   })()
 
   // Build unique client names from entries for report charts
-  const activeClientNames = [...new Set(entries.map((e) => e.client))]
+  const activeClientNames = Array.from(new Set(entries.map((e) => e.client)))
 
   const hoursByClient = activeClientNames.map((c, i) => ({
     client: c,

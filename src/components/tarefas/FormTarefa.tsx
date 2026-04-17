@@ -227,7 +227,7 @@ export default function FormTarefa({
                 Responsavel <span className="text-red-500">*</span>
               </Label>
               <Select
-                value={form.responsavelId}
+                value={form.responsavelId ?? ''}
                 onValueChange={(v) => updateField("responsavelId", v)}
               >
                 <SelectTrigger className={cn(errors.responsavelId && "border-red-500")}>

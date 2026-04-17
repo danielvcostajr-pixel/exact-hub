@@ -261,7 +261,7 @@ export function OKRCard({ okr, empresaId, onUpdateKRValor }: OKRCardProps) {
       try {
         const data = await getTarefasByEmpresa(empresaId)
         if (data) {
-          const linked = (data as TarefaVinculada[]).filter((t: { okrId?: string }) => t.okrId === okr.id)
+          const linked = (data as unknown as TarefaVinculada[]).filter((t) => (t as unknown as { okrId?: string }).okrId === okr.id)
           setTarefasVinculadas(linked)
         }
       } catch { /* ignore */ }

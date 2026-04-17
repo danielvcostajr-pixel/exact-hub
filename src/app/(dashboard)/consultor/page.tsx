@@ -661,11 +661,15 @@ function MiniOKRsPreview({ clientId, clientName }: { clientId: string; clientNam
         const data = await getOKRsByEmpresa(clientId)
         if (!cancelled && data) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const mapStatus = (s?: string) => {
+            const m: Record<string, string> = { RASCUNHO: 'Rascunho', ATIVO: 'Ativo', CONCLUIDO: 'Concluido', CANCELADO: 'Cancelado' }
+            return (s && m[s]) || 'Ativo'
+          }
           const mapped: OKR[] = data.map((d: any) => ({
             id: d.id,
             objetivo: d.objetivo,
             descricao: d.descricao ?? "",
-            status: d.status ?? "Ativo",
+            status: mapStatus(d.status),
             prazoInicio: d.prazoInicio ?? "",
             prazoFim: d.prazoFim ?? "",
             responsavelId: d.responsavelId ?? "",
@@ -932,7 +936,7 @@ function ClientFocusedView({ clientId }: { clientId: string }) {
         if (data) {
           setOkrSummary({
             total: data.length,
-            concluidos: data.filter((d: { status?: string }) => d.status === "Concluido").length,
+            concluidos: data.filter((d: { status?: string }) => d.status === "CONCLUIDO" || d.status === "Concluido").length,
           })
         }
       } catch { /* ignore */ }

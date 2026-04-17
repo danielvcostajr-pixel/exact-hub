@@ -41,7 +41,7 @@ interface Reuniao {
   id: string
   titulo: string
   dataHora: string
-  participantes: string[]
+  participantes?: string[]
   pauta: string
 }
 
