@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { ChevronDown, ChevronUp, Check, Pencil, Plus, Loader2, CheckCircle, Target, TrendingUp, GitBranch } from 'lucide-react'
+import { ChevronDown, ChevronUp, Check, Pencil, Plus, Loader2, CheckCircle, Target, TrendingUp, GitBranch, Trash2, Link2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { createTarefa, getCurrentUserId, getTarefasByEmpresa } from '@/lib/api/data-service'
+import { createTarefa, getCurrentUserId, getTarefasByEmpresa, updateTarefa, deleteTarefa } from '@/lib/api/data-service'
 
 export type OKRStatus = 'Rascunho' | 'Ativo' | 'Concluido' | 'Cancelado'
 
@@ -106,10 +106,50 @@ const TAREFA_STATUS_LABELS: Record<string, string> = {
 }
 
 // ── Tarefa row (usada dentro do KR e na lista de soltas) ────────────────────
-function TarefaItem({ t, leaf }: { t: TarefaVinculada; leaf?: boolean }) {
+function TarefaItem({
+  t,
+  leaf,
+  keyResults,
+  onReload,
+}: {
+  t: TarefaVinculada
+  leaf?: boolean
+  keyResults?: KeyResult[]
+  onReload?: () => void
+}) {
   const tituloPlano = t.acao?.plano?.titulo
+  const [showReassign, setShowReassign] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  async function handleReassignKR(newKrId: string) {
+    if (!newKrId) return
+    setSaving(true)
+    try {
+      await updateTarefa(t.id, { keyResultId: newKrId })
+      setShowReassign(false)
+      onReload?.()
+    } catch (err) {
+      console.error('Erro ao reatribuir:', err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm(`Excluir a tarefa "${t.titulo}"? Isso e permanente.`)) return
+    setSaving(true)
+    try {
+      await deleteTarefa(t.id)
+      onReload?.()
+    } catch (err) {
+      console.error('Erro ao excluir:', err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
-    <div className="flex items-center gap-2 relative">
+    <div className="flex items-center gap-2 relative group">
       {/* conector em L */}
       {leaf && (
         <div className="absolute left-0 top-0 bottom-0 flex items-center pointer-events-none" aria-hidden>
@@ -140,7 +180,45 @@ function TarefaItem({ t, leaf }: { t: TarefaVinculada; leaf?: boolean }) {
         <Badge className={`text-[9px] h-4 px-1.5 border-0 shrink-0 ${TAREFA_STATUS_COLORS[t.status] ?? TAREFA_STATUS_COLORS.BACKLOG}`}>
           {TAREFA_STATUS_LABELS[t.status] ?? t.status}
         </Badge>
+        {/* acoes rapidas: reatribuir KR e excluir (so aparecem quando ha keyResults disponiveis) */}
+        {keyResults && keyResults.length > 0 && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowReassign((s) => !s) }}
+            className="text-muted-foreground/70 hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+            title="Vincular a um Key Result"
+            disabled={saving}
+          >
+            <Link2 size={11} />
+          </button>
+        )}
+        <button
+          onClick={(e) => { e.stopPropagation(); handleDelete() }}
+          className="text-muted-foreground/70 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+          title="Excluir tarefa"
+          disabled={saving}
+        >
+          <Trash2 size={11} />
+        </button>
       </div>
+      {/* painel de reatribuicao */}
+      {showReassign && keyResults && keyResults.length > 0 && (
+        <div className={`absolute right-0 top-full mt-1 z-20 bg-card border border-border rounded-md shadow-lg p-2 min-w-[240px]`}>
+          <p className="text-[10px] text-muted-foreground mb-1 px-1">Vincular a qual Key Result?</p>
+          <div className="flex flex-col gap-1 max-h-48 overflow-auto">
+            {keyResults.map((kr) => (
+              <button
+                key={kr.id}
+                onClick={() => handleReassignKR(kr.id)}
+                disabled={saving}
+                className="text-left text-xs text-foreground hover:bg-secondary rounded px-2 py-1.5 truncate"
+              >
+                <TrendingUp size={10} className="inline mr-1 text-primary" />
+                {kr.descricao}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -152,6 +230,7 @@ function KRRow({
   empresaId,
   tarefas,
   index,
+  todosKRs,
   onUpdate,
   onTarefaCriada,
 }: {
@@ -160,6 +239,7 @@ function KRRow({
   empresaId: string
   tarefas: TarefaVinculada[]
   index: number
+  todosKRs: KeyResult[]
   onUpdate: (newVal: number) => void
   onTarefaCriada: () => void
 }) {
@@ -281,7 +361,7 @@ function KRRow({
               </p>
             )}
             {tarefas.map((t) => (
-              <TarefaItem key={t.id} t={t} leaf />
+              <TarefaItem key={t.id} t={t} leaf keyResults={todosKRs} onReload={onTarefaCriada} />
             ))}
           </div>
         )}
@@ -461,6 +541,7 @@ export function OKRCard({ okr, empresaId, onUpdateKRValor }: OKRCardProps) {
                   empresaId={empresaId}
                   tarefas={tarefasPorKR[kr.id] ?? []}
                   index={idx}
+                  todosKRs={okr.keyResults}
                   onUpdate={(val) => onUpdateKRValor(okr.id, kr.id, val)}
                   onTarefaCriada={loadTarefas}
                 />
@@ -477,7 +558,7 @@ export function OKRCard({ okr, empresaId, onUpdateKRValor }: OKRCardProps) {
               </p>
               <div className="flex flex-col gap-1">
                 {tarefasSemKR.map((t) => (
-                  <TarefaItem key={t.id} t={t} />
+                  <TarefaItem key={t.id} t={t} keyResults={okr.keyResults} onReload={loadTarefas} />
                 ))}
               </div>
             </div>
