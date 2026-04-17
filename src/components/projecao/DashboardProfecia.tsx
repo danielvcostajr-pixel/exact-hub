@@ -355,12 +355,12 @@ export function DashboardProfecia({ resultado, kpis, faturamento, mesInicial = 0
                       }`}
                     >
                       <td
-                        className={`px-4 py-2.5 sticky left-0 z-10 ${
+                        className={`px-4 py-2.5 sticky left-0 z-10 bg-card ${
                           isSectionHeader
-                            ? 'bg-primary/5'
+                            ? 'border-l-2 border-primary'
                             : isDestaque
-                            ? 'bg-secondary/40'
-                            : 'bg-card'
+                            ? 'border-l-2 border-muted-foreground/40'
+                            : ''
                         }`}
                       >
                         <span

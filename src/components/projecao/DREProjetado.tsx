@@ -108,12 +108,14 @@ export function DREProjetado({ linhas: linhasRaw, mesInicial = 0 }: DREProjetado
                     }`}
                   >
                     <td
-                      className={`px-4 py-2 sticky left-0 z-10 ${
+                      className={`px-4 py-2 sticky left-0 z-10 bg-card ${
                         isKpiHeader
-                          ? 'bg-blue-500/10'
+                          ? 'border-l-2 border-blue-500'
                           : isKpi
-                          ? 'bg-blue-500/5'
-                          : isDestaque ? 'bg-secondary/30' : 'bg-card'
+                          ? 'border-l-2 border-blue-500/40'
+                          : isDestaque
+                          ? 'border-l-2 border-muted-foreground/40'
+                          : ''
                       }`}
                     >
                       <span
