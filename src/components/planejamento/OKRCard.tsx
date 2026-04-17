@@ -45,8 +45,14 @@ interface TarefaVinculada {
   prioridade: string
   responsavel?: { nome: string } | null
   prazo?: string
-  okrId?: string
+  okrId?: string | null
   keyResultId?: string | null
+  acaoId?: string | null
+  acao?: {
+    id: string
+    planoId: string
+    plano?: { id: string; okrId?: string | null; titulo?: string } | null
+  } | null
 }
 
 function calcProgress(kr: KeyResult): number {
@@ -101,6 +107,7 @@ const TAREFA_STATUS_LABELS: Record<string, string> = {
 
 // ── Tarefa row (usada dentro do KR e na lista de soltas) ────────────────────
 function TarefaItem({ t, leaf }: { t: TarefaVinculada; leaf?: boolean }) {
+  const tituloPlano = t.acao?.plano?.titulo
   return (
     <div className="flex items-center gap-2 relative">
       {/* conector em L */}
@@ -115,9 +122,16 @@ function TarefaItem({ t, leaf }: { t: TarefaVinculada; leaf?: boolean }) {
         ) : (
           <div className="w-3 h-3 rounded-full border-2 border-muted-foreground/40 shrink-0" />
         )}
-        <span className={`text-xs truncate flex-1 ${t.status === 'CONCLUIDA' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-          {t.titulo}
-        </span>
+        <div className="flex flex-col flex-1 min-w-0">
+          <span className={`text-xs truncate ${t.status === 'CONCLUIDA' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+            {t.titulo}
+          </span>
+          {tituloPlano && (
+            <span className="text-[9px] text-primary/70 truncate">
+              via plano: {tituloPlano}
+            </span>
+          )}
+        </div>
         {t.responsavel?.nome && (
           <span className="text-[10px] text-muted-foreground shrink-0">
             {t.responsavel.nome.split(' ')[0]}
@@ -332,9 +346,13 @@ export function OKRCard({ okr, empresaId, onUpdateKRValor }: OKRCardProps) {
     try {
       const data = await getTarefasByEmpresa(empresaId)
       if (data) {
-        const linked = (data as unknown as TarefaVinculada[]).filter(
-          (t) => (t as unknown as { okrId?: string }).okrId === okr.id
-        )
+        const linked = (data as unknown as TarefaVinculada[]).filter((t) => {
+          // vinculo direto
+          if (t.okrId === okr.id) return true
+          // vinculo indireto via plano de acao
+          if (t.acao?.plano?.okrId === okr.id) return true
+          return false
+        })
         setTodasTarefas(linked)
       }
     } catch { /* ignore */ }
@@ -450,12 +468,12 @@ export function OKRCard({ okr, empresaId, onUpdateKRValor }: OKRCardProps) {
             </div>
           )}
 
-          {/* Acoes vinculadas ao OKR mas sem KR especifico */}
+          {/* Acoes vinculadas ao OKR (direto ou via plano) mas sem KR especifico */}
           {tarefasSemKR.length > 0 && (
             <div className="rounded-lg border border-dashed border-border bg-background/40 p-3">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1">
                 <GitBranch size={10} />
-                Acoes gerais do OKR (sem KR especifico)
+                Acoes vinculadas a este OKR (sem KR especifico)
               </p>
               <div className="flex flex-col gap-1">
                 {tarefasSemKR.map((t) => (

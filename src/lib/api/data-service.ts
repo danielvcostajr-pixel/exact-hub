@@ -206,8 +206,10 @@ export async function deleteOKR(okrId: string) {
 
 export async function getTarefasByEmpresa(empresaId: string) {
   const supabase = createClient()
+  // Incluir plano (para descobrir OKR via acaoId -> planoId -> okrId)
   const { data, error } = await supabase
-    .from('Tarefa').select('*, responsavel:Usuario!responsavelId(id, nome)')
+    .from('Tarefa')
+    .select('*, responsavel:Usuario!responsavelId(id, nome), acao:Acao(id, planoId, plano:PlanoAcao(id, okrId, titulo))')
     .eq('empresaId', empresaId).order('createdAt', { ascending: false })
   if (error) throw error
   return data
