@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, ClipboardList, MessageSquare, BarChart3, Eye, Send, CheckCircle, FileText, ArrowLeft, UserPlus, X, Loader2, Sparkles } from 'lucide-react'
+import { Plus, ClipboardList, MessageSquare, BarChart3, Eye, Send, CheckCircle, FileText, ArrowLeft, UserPlus, Loader2, Sparkles } from 'lucide-react'
 import { useClienteContext } from '@/hooks/useClienteContext'
-import { getEntrevistasByEmpresa, getRespostasByEntrevista, createResposta } from '@/lib/api/data-service'
+import { getEntrevistasByEmpresa, getRespostasByEntrevista, createResposta, listarTranscricoesEntrevistas } from '@/lib/api/data-service'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -253,21 +253,27 @@ export default function EntrevistasPage() {
   const [entrevistas, setEntrevistas] = useState<Entrevista[]>([])
   const [respostas, setRespostas] = useState<RespostaEntrevista[]>([])
   const [respostasCounts, setRespostasCounts] = useState<Record<string, number>>({})
+  const [totalTranscricoes, setTotalTranscricoes] = useState(0)
   const [formOpen, setFormOpen] = useState(false)
   const [responderOpen, setResponderOpen] = useState(false)
   const [entrevistaParaResponder, setEntrevistaParaResponder] = useState<Entrevista | null>(null)
   const [activeTab, setActiveTab] = useState('questionarios')
+  const [tabInicialAjustada, setTabInicialAjustada] = useState(false)
   const [analiseAtiva, setAnaliseAtiva] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Load entrevistas and their response counts
+  // Load entrevistas, response counts AND transcription count
   const loadData = useCallback(async () => {
     if (!clienteAtivo) return
     setLoading(true)
     try {
-      const data = await getEntrevistasByEmpresa(clienteAtivo.id)
+      const [data, transcricoes] = await Promise.all([
+        getEntrevistasByEmpresa(clienteAtivo.id),
+        listarTranscricoesEntrevistas(clienteAtivo.id).catch(() => []),
+      ])
       const ents = data as unknown as Entrevista[]
       setEntrevistas(ents)
+      setTotalTranscricoes(transcricoes.length)
 
       // Load response counts for each entrevista
       const counts: Record<string, number> = {}
@@ -288,6 +294,7 @@ export default function EntrevistasPage() {
       setRespostas(allRespostas)
     } catch {
       setEntrevistas([])
+      setTotalTranscricoes(0)
     } finally {
       setLoading(false)
     }
@@ -296,6 +303,15 @@ export default function EntrevistasPage() {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  // Após primeira carga, se só tiver transcrições e nenhum questionário, abre na aba Biblioteca
+  useEffect(() => {
+    if (loading || tabInicialAjustada) return
+    if (entrevistas.length === 0 && totalTranscricoes > 0) {
+      setActiveTab('transcricoes')
+    }
+    setTabInicialAjustada(true)
+  }, [loading, entrevistas.length, totalTranscricoes, tabInicialAjustada])
 
   function handleSaveEntrevista(entrevista: Entrevista) {
     setEntrevistas((prev) => [entrevista, ...prev])
@@ -338,7 +354,8 @@ export default function EntrevistasPage() {
     )
   }
 
-  if (entrevistas.length === 0) {
+  // Se já subiu ao menos 1 transcrição, abrir direto na Biblioteca mesmo sem questionário formal
+  if (entrevistas.length === 0 && totalTranscricoes === 0) {
     return (
       <div className="flex flex-col gap-5 p-6 min-h-screen bg-background">
         <div className="flex items-center gap-3">
@@ -375,7 +392,11 @@ export default function EntrevistasPage() {
         </div>
         {activeTab === 'transcricoes' && (
           <div className="mt-4">
-            <BibliotecaTranscricoes empresaId={clienteAtivo?.id ?? ''} nomeEmpresa={clienteAtivo?.nome} />
+            <BibliotecaTranscricoes
+            empresaId={clienteAtivo?.id ?? ''}
+            nomeEmpresa={clienteAtivo?.nome}
+            onChanged={(n) => setTotalTranscricoes(n)}
+          />
           </div>
         )}
         <FormQuestionario
@@ -405,7 +426,7 @@ export default function EntrevistasPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Entrevistas com Equipe</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {entrevistas.length} questionarios criados &bull; {totalRespostas} respostas coletadas
+            {entrevistas.length} questionarios &bull; {totalRespostas} respostas &bull; {totalTranscricoes} {totalTranscricoes === 1 ? 'transcricao salva' : 'transcricoes salvas'}
           </p>
         </div>
         <Button
@@ -621,7 +642,11 @@ export default function EntrevistasPage() {
 
         {/* Tab: Transcrições */}
         <TabsContent value="transcricoes" className="mt-4">
-          <BibliotecaTranscricoes empresaId={clienteAtivo?.id ?? ''} nomeEmpresa={clienteAtivo?.nome} />
+          <BibliotecaTranscricoes
+            empresaId={clienteAtivo?.id ?? ''}
+            nomeEmpresa={clienteAtivo?.nome}
+            onChanged={(n) => setTotalTranscricoes(n)}
+          />
         </TabsContent>
 
       </Tabs>

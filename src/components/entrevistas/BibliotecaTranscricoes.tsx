@@ -49,9 +49,11 @@ type AnaliseResult = {
 export function BibliotecaTranscricoes({
   empresaId,
   nomeEmpresa,
+  onChanged,
 }: {
   empresaId: string
   nomeEmpresa?: string
+  onChanged?: (total: number) => void
 }) {
   const [transcricoes, setTranscricoes] = useState<TranscricaoEntrevista[]>([])
   const [loading, setLoading] = useState(true)
@@ -69,12 +71,13 @@ export function BibliotecaTranscricoes({
     try {
       const data = await listarTranscricoesEntrevistas(empresaId)
       setTranscricoes(data)
+      onChanged?.(data.length)
     } catch (err) {
       setErro((err as Error).message)
     } finally {
       setLoading(false)
     }
-  }, [empresaId])
+  }, [empresaId, onChanged])
 
   useEffect(() => {
     carregar()
@@ -101,7 +104,11 @@ export function BibliotecaTranscricoes({
     if (!confirm('Remover esta transcrição?')) return
     try {
       await deletarTranscricaoEntrevista(id)
-      setTranscricoes((prev) => prev.filter((t) => t.id !== id))
+      setTranscricoes((prev) => {
+        const novo = prev.filter((t) => t.id !== id)
+        onChanged?.(novo.length)
+        return novo
+      })
       setSelecionadas((prev) => {
         const nxt = new Set(prev)
         nxt.delete(id)
@@ -340,7 +347,11 @@ export function BibliotecaTranscricoes({
         onClose={() => setUploadOpen(false)}
         empresaId={empresaId}
         onSaved={(t) => {
-          setTranscricoes((prev) => [t, ...prev])
+          setTranscricoes((prev) => {
+            const novo = [t, ...prev]
+            onChanged?.(novo.length)
+            return novo
+          })
           setUploadOpen(false)
         }}
       />
