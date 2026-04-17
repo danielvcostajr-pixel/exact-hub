@@ -552,10 +552,28 @@ export function OKRCard({ okr, empresaId, onUpdateKRValor }: OKRCardProps) {
           {/* Acoes vinculadas ao OKR (direto ou via plano) mas sem KR especifico */}
           {tarefasSemKR.length > 0 && (
             <div className="rounded-lg border border-dashed border-border bg-background/40 p-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1">
-                <GitBranch size={10} />
-                Acoes vinculadas a este OKR (sem KR especifico)
-              </p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                  <GitBranch size={10} />
+                  Acoes vinculadas a este OKR (sem KR especifico)
+                </p>
+                <button
+                  onClick={async () => {
+                    if (!confirm(`Excluir ${tarefasSemKR.length} tarefa(s) sem KR especifico? Isso e permanente.`)) return
+                    try {
+                      await Promise.all(tarefasSemKR.map((t) => deleteTarefa(t.id)))
+                      loadTarefas()
+                    } catch (err) {
+                      console.error('Erro ao limpar:', err)
+                    }
+                  }}
+                  className="text-[10px] text-red-500 hover:text-red-600 flex items-center gap-1"
+                  title={`Excluir todas as ${tarefasSemKR.length} tarefas`}
+                >
+                  <Trash2 size={10} />
+                  Limpar {tarefasSemKR.length}
+                </button>
+              </div>
               <div className="flex flex-col gap-1">
                 {tarefasSemKR.map((t) => (
                   <TarefaItem key={t.id} t={t} keyResults={okr.keyResults} onReload={loadTarefas} />

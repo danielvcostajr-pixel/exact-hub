@@ -380,8 +380,23 @@ export async function createPlanoAcao(params: {
 
 export async function deletePlanoAcao(planoId: string) {
   const supabase = createClient()
-  // Acao e PapelAcaoRACI têm cascade no schema
+  // 1) Buscar ids das acoes deste plano
+  const { data: acoes } = await supabase.from('Acao').select('id').eq('planoId', planoId)
+  const acaoIds = (acoes ?? []).map((a) => a.id)
+  // 2) Deletar tarefas que referenciam qualquer dessas acoes
+  if (acaoIds.length > 0) {
+    await supabase.from('Tarefa').delete().in('acaoId', acaoIds)
+  }
+  // 3) Deletar o plano (cascade derruba Acao e PapelAcaoRACI via schema)
   const { error } = await supabase.from('PlanoAcao').delete().eq('id', planoId)
+  if (error) throw error
+}
+
+/// Deleta uma acao individualmente e as tarefas vinculadas a ela
+export async function deleteAcao(acaoId: string) {
+  const supabase = createClient()
+  await supabase.from('Tarefa').delete().eq('acaoId', acaoId)
+  const { error } = await supabase.from('Acao').delete().eq('id', acaoId)
   if (error) throw error
 }
 
