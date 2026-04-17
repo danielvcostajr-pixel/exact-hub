@@ -8,10 +8,6 @@ function now() {
   return new Date().toISOString()
 }
 
-async function supabaseClient() {
-  return createClient()
-}
-
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
 export async function getCurrentUserId(): Promise<string | null> {
@@ -92,12 +88,15 @@ export async function saveCanvas(empresaId: string, canvasData: Record<string, u
   const existing = await getCanvasByEmpresa(empresaId)
   if (existing) {
     const { data, error } = await supabase
-      .from('BusinessModelCanvas').update({ blocos: canvasData }).eq('id', existing.id).select().single()
+      .from('BusinessModelCanvas').update({ blocos: canvasData, updatedAt: now() }).eq('id', existing.id).select().single()
     if (error) throw error
     return data
   } else {
+    const nowIso = now()
     const { data, error } = await supabase
-      .from('BusinessModelCanvas').insert({ empresaId, blocos: canvasData, versao: 1 }).select().single()
+      .from('BusinessModelCanvas')
+      .insert({ id: uuid(), empresaId, blocos: canvasData, versao: 1, createdAt: nowIso, updatedAt: nowIso })
+      .select().single()
     if (error) throw error
     return data
   }
@@ -120,12 +119,15 @@ export async function saveProjecao(empresaId: string, projecaoData: Record<strin
   const anoBase = (projecaoData as { anoBase?: number }).anoBase ?? new Date().getFullYear()
   if (existing) {
     const { data, error } = await supabase
-      .from('ProjecaoFinanceira').update({ dados: projecaoData, anoBase }).eq('id', existing.id).select().single()
+      .from('ProjecaoFinanceira').update({ dados: projecaoData, anoBase, updatedAt: now() }).eq('id', existing.id).select().single()
     if (error) throw error
     return data
   } else {
+    const nowIso = now()
     const { data, error } = await supabase
-      .from('ProjecaoFinanceira').insert({ empresaId, nome: 'Projecao Principal', anoBase, dados: projecaoData }).select().single()
+      .from('ProjecaoFinanceira')
+      .insert({ id: uuid(), empresaId, nome: 'Projecao Principal', anoBase, dados: projecaoData, createdAt: nowIso, updatedAt: nowIso })
+      .select().single()
     if (error) throw error
     return data
   }
@@ -148,11 +150,13 @@ export async function createOKR(params: {
   prazoInicio: string; prazoFim: string; responsavelId: string; status?: string
 }) {
   const supabase = createClient()
+  const nowIso = now()
   const { data, error } = await supabase.from('OKR').insert({
-    empresaId: params.empresaId, objetivo: params.objetivo,
+    id: uuid(), empresaId: params.empresaId, objetivo: params.objetivo,
     descricao: params.descricao ?? null, prazoInicio: params.prazoInicio,
     prazoFim: params.prazoFim, responsavelId: params.responsavelId,
     status: params.status ?? 'ATIVO',
+    createdAt: nowIso, updatedAt: nowIso,
   }).select('*, KeyResult(*)').single()
   if (error) throw error
   return data
@@ -160,7 +164,7 @@ export async function createOKR(params: {
 
 export async function updateOKR(okrId: string, updates: Record<string, unknown>) {
   const supabase = createClient()
-  const { data, error } = await supabase.from('OKR').update({ ...updates }).eq('id', okrId).select('*, KeyResult(*)').single()
+  const { data, error } = await supabase.from('OKR').update({ ...updates, updatedAt: now() }).eq('id', okrId).select('*, KeyResult(*)').single()
   if (error) throw error
   return data
 }
@@ -170,11 +174,13 @@ export async function createKeyResult(params: {
   valorAtual?: number; unidade?: string; responsavelId: string
 }) {
   const supabase = createClient()
+  const nowIso = now()
   const { data, error } = await supabase.from('KeyResult').insert({
-    okrId: params.okrId, descricao: params.descricao,
+    id: uuid(), okrId: params.okrId, descricao: params.descricao,
     metaInicial: params.metaInicial, metaAlvo: params.metaAlvo,
     valorAtual: params.valorAtual ?? 0, unidade: params.unidade ?? '%',
     progressoPerc: 0, responsavelId: params.responsavelId,
+    createdAt: nowIso, updatedAt: nowIso,
   }).select().single()
   if (error) throw error
   return data
@@ -182,7 +188,7 @@ export async function createKeyResult(params: {
 
 export async function updateKeyResult(krId: string, updates: Record<string, unknown>) {
   const supabase = createClient()
-  const { data, error } = await supabase.from('KeyResult').update({ ...updates }).eq('id', krId).select().single()
+  const { data, error } = await supabase.from('KeyResult').update({ ...updates, updatedAt: now() }).eq('id', krId).select().single()
   if (error) throw error
   return data
 }
@@ -213,12 +219,13 @@ export async function createTarefa(params: {
   okrId?: string
 }) {
   const supabase = createClient()
+  const nowIso = now()
   const { data, error } = await supabase.from('Tarefa').insert({
-    empresaId: params.empresaId, titulo: params.titulo,
+    id: uuid(), empresaId: params.empresaId, titulo: params.titulo,
     descricao: params.descricao ?? null, status: params.status ?? 'BACKLOG',
     prioridade: params.prioridade ?? 'MEDIA', prazo: params.prazo ?? null,
     responsavelId: params.responsavelId ?? null, criadoPorId: params.criadoPorId,
-    okrId: params.okrId ?? null,
+    okrId: params.okrId ?? null, createdAt: nowIso, updatedAt: nowIso,
   }).select().single()
   if (error) throw error
   return data
@@ -226,7 +233,7 @@ export async function createTarefa(params: {
 
 export async function updateTarefa(tarefaId: string, updates: Record<string, unknown>) {
   const supabase = createClient()
-  const { data, error } = await supabase.from('Tarefa').update({ ...updates }).eq('id', tarefaId).select().single()
+  const { data, error } = await supabase.from('Tarefa').update({ ...updates, updatedAt: now() }).eq('id', tarefaId).select().single()
   if (error) throw error
   return data
 }
@@ -252,12 +259,14 @@ export async function createRotina(params: {
   categoria?: string; diaSemana?: number; diaMes?: number; hora?: string; responsavelId: string
 }) {
   const supabase = createClient()
+  const nowIso = now()
   const { data, error } = await supabase.from('Rotina').insert({
-    empresaId: params.empresaId, nome: params.nome,
+    id: uuid(), empresaId: params.empresaId, nome: params.nome,
     descricao: params.descricao ?? null, frequencia: params.frequencia,
     categoria: params.categoria ?? null, diaSemana: params.diaSemana ?? null,
     diaMes: params.diaMes ?? null, hora: params.hora ?? null,
     responsavelId: params.responsavelId, ativo: true,
+    createdAt: nowIso, updatedAt: nowIso,
   }).select().single()
   if (error) throw error
   return data
@@ -265,7 +274,7 @@ export async function createRotina(params: {
 
 export async function updateRotina(rotinaId: string, updates: Record<string, unknown>) {
   const supabase = createClient()
-  const { data, error } = await supabase.from('Rotina').update({ ...updates }).eq('id', rotinaId).select().single()
+  const { data, error } = await supabase.from('Rotina').update({ ...updates, updatedAt: now() }).eq('id', rotinaId).select().single()
   if (error) throw error
   return data
 }
@@ -282,7 +291,7 @@ export async function createItemControle(params: {
 }) {
   const supabase = createClient()
   const { data, error } = await supabase.from('ItemControle').insert({
-    rotinaId: params.rotinaId, descricao: params.descricao,
+    id: uuid(), rotinaId: params.rotinaId, descricao: params.descricao,
     ordem: params.ordem, obrigatorio: params.obrigatorio ?? false,
   }).select().single()
   if (error) throw error
@@ -296,11 +305,13 @@ export async function saveExecucaoRotina(params: {
   const supabase = createClient()
   const dataExecucao = now()
   const rows = params.itens.map(it => ({
+    id: uuid(),
     itemControleId: it.itemControleId,
     concluido: it.concluido,
     observacao: it.observacao ?? null,
     executadoPorId: params.executadoPorId,
     dataExecucao,
+    createdAt: dataExecucao,
   }))
   const { data, error } = await supabase.from('ExecucaoItemControle').insert(rows).select()
   if (error) throw error
@@ -354,9 +365,11 @@ export async function createPlanoAcao(params: {
   empresaId: string; titulo: string; descricao?: string; okrId?: string
 }) {
   const supabase = createClient()
+  const nowIso = now()
   const { data, error } = await supabase.from('PlanoAcao').insert({
-    empresaId: params.empresaId, titulo: params.titulo,
+    id: uuid(), empresaId: params.empresaId, titulo: params.titulo,
     descricao: params.descricao ?? null, okrId: params.okrId ?? null,
+    createdAt: nowIso, updatedAt: nowIso,
   }).select().single()
   if (error) throw error
   return data
@@ -373,9 +386,11 @@ export async function createAcao(params: {
   planoId: string; descricao: string; prazo?: string; status?: string
 }) {
   const supabase = createClient()
+  const nowIso = now()
   const { data, error } = await supabase.from('Acao').insert({
-    planoId: params.planoId, descricao: params.descricao,
+    id: uuid(), planoId: params.planoId, descricao: params.descricao,
     prazo: params.prazo ?? null, status: params.status ?? 'PENDENTE',
+    createdAt: nowIso, updatedAt: nowIso,
   }).select().single()
   if (error) throw error
   return data
@@ -383,7 +398,7 @@ export async function createAcao(params: {
 
 export async function updateAcao(acaoId: string, updates: Record<string, unknown>) {
   const supabase = createClient()
-  const { data, error } = await supabase.from('Acao').update({ ...updates }).eq('id', acaoId).select().single()
+  const { data, error } = await supabase.from('Acao').update({ ...updates, updatedAt: now() }).eq('id', acaoId).select().single()
   if (error) throw error
   return data
 }
@@ -403,8 +418,10 @@ export async function getOrCreateConversa(empresaId: string, titulo?: string) {
   const existing = await getConversaByEmpresa(empresaId)
   if (existing) return existing
   const supabase = createClient()
+  const nowIso = now()
   const { data, error } = await supabase.from('Conversa').insert({
-    empresaId, titulo: titulo ?? 'Chat Principal',
+    id: uuid(), empresaId, titulo: titulo ?? 'Chat Principal',
+    createdAt: nowIso, updatedAt: nowIso,
   }).select().single()
   if (error) throw error
   return data
@@ -422,7 +439,7 @@ export async function getMensagens(conversaId: string) {
 export async function sendMensagem(params: { conversaId: string; conteudo: string; remetenteId: string }) {
   const supabase = createClient()
   const { data, error } = await supabase.from('Mensagem').insert({
-    conversaId: params.conversaId, conteudo: params.conteudo, remetenteId: params.remetenteId,
+    id: uuid(), conversaId: params.conversaId, conteudo: params.conteudo, remetenteId: params.remetenteId,
   }).select('*, remetente:Usuario!remetenteId(id, nome, papel)').single()
   if (error) throw error
   // Update conversa updatedAt
@@ -445,11 +462,13 @@ export async function createReuniao(params: {
   duracaoMinutos?: number; local?: string; linkReuniao?: string; status?: string
 }) {
   const supabase = createClient()
+  const nowIso = now()
   const { data, error } = await supabase.from('Reuniao').insert({
-    empresaId: params.empresaId, titulo: params.titulo,
+    id: uuid(), empresaId: params.empresaId, titulo: params.titulo,
     descricao: params.descricao ?? null, dataHora: params.dataHora,
     duracaoMinutos: params.duracaoMinutos ?? 60, local: params.local ?? null,
     linkReuniao: params.linkReuniao ?? null, status: params.status ?? 'AGENDADA',
+    createdAt: nowIso, updatedAt: nowIso,
   }).select().single()
   if (error) throw error
   return data
@@ -457,7 +476,7 @@ export async function createReuniao(params: {
 
 export async function updateReuniao(reuniaoId: string, updates: Record<string, unknown>) {
   const supabase = createClient()
-  const { data, error } = await supabase.from('Reuniao').update({ ...updates }).eq('id', reuniaoId).select().single()
+  const { data, error } = await supabase.from('Reuniao').update({ ...updates, updatedAt: now() }).eq('id', reuniaoId).select().single()
   if (error) throw error
   return data
 }
@@ -500,10 +519,11 @@ export async function createTimeEntry(params: {
   const userId = await getCurrentUserId()
   if (!userId) throw new Error('Usuario nao autenticado')
   const { data, error } = await supabase.from('Timesheet').insert({
-    empresaId: params.empresaId, usuarioId: userId,
+    id: uuid(), empresaId: params.empresaId, usuarioId: userId,
     descricao: params.descricao ?? null, data: params.data,
     horaInicio: params.horaInicio ?? null, horaFim: params.horaFim ?? null,
     duracaoMinutos: params.duracaoMinutos, categoria: params.categoria ?? null,
+    createdAt: now(),
   }).select().single()
   if (error) throw error
   return data
@@ -531,13 +551,15 @@ export async function createRelatorio(params: {
   proximaSemana?: string; kpis?: Record<string, unknown>; criadoPorId: string
 }) {
   const supabase = createClient()
+  const nowIso = now()
   const { data, error } = await supabase.from('RelatorioSemanal').insert({
-    empresaId: params.empresaId, semanaInicio: params.semanaInicio,
+    id: uuid(), empresaId: params.empresaId, semanaInicio: params.semanaInicio,
     semanaFim: params.semanaFim, resumoExecutivo: params.resumoExecutivo ?? null,
     tarefasConcluidas: params.tarefasConcluidas ?? null,
     tarefasEmAndamento: params.tarefasEmAndamento ?? null,
     problemas: params.problemas ?? null, proximaSemana: params.proximaSemana ?? null,
     kpis: params.kpis ?? null, criadoPorId: params.criadoPorId,
+    createdAt: nowIso, updatedAt: nowIso,
   }).select().single()
   if (error) throw error
   return data
@@ -557,10 +579,12 @@ export async function createEntrevista(params: {
   empresaId: string; titulo: string; descricao?: string; perguntas: unknown; criadoPorId: string
 }) {
   const supabase = createClient()
+  const nowIso = now()
   const { data, error } = await supabase.from('Entrevista').insert({
-    empresaId: params.empresaId, titulo: params.titulo,
+    id: uuid(), empresaId: params.empresaId, titulo: params.titulo,
     descricao: params.descricao ?? null, perguntas: params.perguntas,
     criadoPorId: params.criadoPorId, status: 'RASCUNHO',
+    createdAt: nowIso, updatedAt: nowIso,
   }).select().single()
   if (error) throw error
   return data
@@ -568,7 +592,7 @@ export async function createEntrevista(params: {
 
 export async function updateEntrevista(entrevistaId: string, updates: Record<string, unknown>) {
   const supabase = createClient()
-  const { data, error } = await supabase.from('Entrevista').update({ ...updates }).eq('id', entrevistaId).select().single()
+  const { data, error } = await supabase.from('Entrevista').update({ ...updates, updatedAt: now() }).eq('id', entrevistaId).select().single()
   if (error) throw error
   return data
 }
@@ -586,8 +610,9 @@ export async function createResposta(params: {
 }) {
   const supabase = createClient()
   const { data, error } = await supabase.from('RespostaEntrevista').insert({
-    entrevistaId: params.entrevistaId, respondente: params.respondente,
+    id: uuid(), entrevistaId: params.entrevistaId, respondente: params.respondente,
     cargo: params.cargo ?? null, area: params.area ?? null, respostas: params.respostas,
+    createdAt: now(),
   }).select().single()
   if (error) throw error
   return data
@@ -619,7 +644,9 @@ export async function createQuickWin(params: {
   const supabase = createClient()
   const impacto = params.impacto ?? 5
   const esforco = params.esforco ?? 5
+  const nowIso = now()
   const { data, error } = await supabase.from('QuickWin').insert({
+    id: uuid(),
     empresaId: params.empresaId,
     titulo: params.titulo,
     categoria: params.categoria,
@@ -628,6 +655,8 @@ export async function createQuickWin(params: {
     quadrante: calcQuadrante(impacto, esforco),
     aplicavel: true,
     status: 'PENDENTE',
+    createdAt: nowIso,
+    updatedAt: nowIso,
   }).select().single()
   if (error) throw error
   return data
@@ -643,7 +672,7 @@ export async function updateQuickWin(quickWinId: string, updates: Record<string,
       updates.quadrante = calcQuadrante(imp, esf)
     }
   }
-  const { data, error } = await supabase.from('QuickWin').update({ ...updates }).eq('id', quickWinId).select().single()
+  const { data, error } = await supabase.from('QuickWin').update({ ...updates, updatedAt: now() }).eq('id', quickWinId).select().single()
   if (error) throw error
   return data
 }
@@ -657,7 +686,9 @@ export async function deleteQuickWin(quickWinId: string) {
 export async function seedQuickWinsParaEmpresa(empresaId: string) {
   const { QUICK_WINS_TEMPLATE } = await import('@/lib/quick-wins-template')
   const supabase = createClient()
+  const nowIso = now()
   const rows = QUICK_WINS_TEMPLATE.map(t => ({
+    id: uuid(),
     empresaId,
     titulo: t.titulo,
     categoria: t.categoria,
@@ -666,6 +697,8 @@ export async function seedQuickWinsParaEmpresa(empresaId: string) {
     quadrante: calcQuadrante(t.impacto, t.esforco),
     aplicavel: true,
     status: 'PENDENTE' as const,
+    createdAt: nowIso,
+    updatedAt: nowIso,
   }))
   const { data, error } = await supabase.from('QuickWin').insert(rows).select()
   if (error) throw error
@@ -690,8 +723,9 @@ export async function saveMemoria(params: {
   const existing = await getMemoriaByEmpresa(params.empresaId)
   const versao = existing ? existing.versao + 1 : 1
   const { data, error } = await supabase.from('MemoriaCliente').insert({
-    empresaId: params.empresaId, conteudo: params.conteudo,
+    id: uuid(), empresaId: params.empresaId, conteudo: params.conteudo,
     versao, geradoPorId: params.geradoPorId,
+    createdAt: now(),
   }).select().single()
   if (error) throw error
   return data
@@ -723,10 +757,12 @@ export async function saveSimulador(params: {
 }) {
   const supabase = createClient()
   // Always create a new record (historico)
+  const nowIso = now()
   const { data, error } = await supabase.from('Simulador').insert({
-    empresaId: params.empresaId, tipo: params.tipo, nome: params.nome,
+    id: uuid(), empresaId: params.empresaId, tipo: params.tipo, nome: params.nome,
     inputs: params.inputs, outputs: params.outputs,
     criadoPorId: params.criadoPorId, ativoParaCliente: false,
+    createdAt: nowIso, updatedAt: nowIso,
   }).select().single()
   if (error) throw error
   return data
@@ -763,17 +799,21 @@ export async function createUsuario(params: {
   })
   if (authErr) {
     // Fallback: try to just insert in Usuario table (auth user might already exist)
+    const nowIso = now()
     const { data, error } = await supabase.from('Usuario').insert({
-      email: params.email, nome: params.nome,
+      id: uuid(), email: params.email, nome: params.nome,
       papel: params.papel, empresaId: params.empresaId ?? null, ativo: true,
+      createdAt: nowIso, updatedAt: nowIso,
     }).select().single()
     if (error) throw error
     return data
   }
   // Insert in Usuario table with auth user id
+  const nowIso = now()
   const { data, error } = await supabase.from('Usuario').insert({
     id: authData.user.id, email: params.email, nome: params.nome,
     papel: params.papel, empresaId: params.empresaId ?? null, ativo: true,
+    createdAt: nowIso, updatedAt: nowIso,
   }).select().single()
   if (error) throw error
   return data

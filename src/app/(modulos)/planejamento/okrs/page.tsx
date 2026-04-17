@@ -138,19 +138,21 @@ export default function OKRsPage() {
         status: 'ATIVO',
       })
 
-      // Create Key Results
+      // Create Key Results em paralelo (muito mais rapido que sequencial)
       if (data.keyResults && data.keyResults.length > 0) {
-        for (const kr of data.keyResults) {
-          await createKeyResult({
-            okrId: created.id,
-            descricao: kr.descricao,
-            metaInicial: kr.metaInicial,
-            metaAlvo: kr.metaAlvo,
-            valorAtual: kr.metaInicial,
-            unidade: kr.unidade,
-            responsavelId: kr.responsavelId || responsavelId,
-          })
-        }
+        await Promise.all(
+          data.keyResults.map((kr) =>
+            createKeyResult({
+              okrId: created.id,
+              descricao: kr.descricao,
+              metaInicial: kr.metaInicial,
+              metaAlvo: kr.metaAlvo,
+              valorAtual: kr.metaInicial,
+              unidade: kr.unidade,
+              responsavelId: kr.responsavelId || responsavelId,
+            })
+          )
+        )
       }
 
       // Reload from DB to get complete data
