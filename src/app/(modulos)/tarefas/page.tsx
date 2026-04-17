@@ -230,6 +230,8 @@ export default function TarefasPage() {
         prazo: data.prazo || undefined,
         responsavelId: data.responsavelId || undefined,
         criadoPorId: userId,
+        okrId: data.okrId || undefined,
+        keyResultId: data.keyResultId || undefined,
       })
       // Reload tasks from DB
       await loadTarefas()
@@ -313,6 +315,7 @@ export default function TarefasPage() {
           onClose={() => setShowForm(false)}
           onSave={handleCreateTarefa}
           usuarios={usuarios}
+          empresaId={clienteAtivo?.id}
         />
       </div>
     )
@@ -550,6 +553,7 @@ export default function TarefasPage() {
         onClose={() => setShowForm(false)}
         onSave={handleCreateTarefa}
         usuarios={usuarios}
+        empresaId={clienteAtivo?.id}
       />
     </div>
   )

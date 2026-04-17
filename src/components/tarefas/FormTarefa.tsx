@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
-import { Plus, Trash2, CheckSquare, Square } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Plus, Trash2, CheckSquare, Square, Target, TrendingUp, ListChecks } from "lucide-react"
+import { getOKRsByEmpresa, getPlanosAcaoByEmpresa } from "@/lib/api/data-service"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -31,12 +32,30 @@ import {
 } from "./tarefas-types"
 import { cn } from "@/lib/utils"
 
+function getPlanoIdFromAcao(acaoId: string, planos: PlanoOption[]): string {
+  for (const p of planos) if (p.acoes.some((a) => a.id === acaoId)) return p.id
+  return ""
+}
+
 interface FormTarefaProps {
   open: boolean
   onClose: () => void
   onSave: (tarefa: Omit<Tarefa, "id" | "comentarios" | "anexos" | "atividades" | "horasTrabalhadas" | "comentariosCount" | "anexosCount">) => void
   initialData?: Partial<Tarefa>
   usuarios?: Usuario[]
+  empresaId?: string
+}
+
+interface OKROption {
+  id: string
+  objetivo: string
+  keyResults: { id: string; descricao: string }[]
+}
+
+interface PlanoOption {
+  id: string
+  titulo: string
+  acoes: { id: string; descricao: string }[]
 }
 
 const DEFAULT_FORM = {
@@ -50,6 +69,7 @@ const DEFAULT_FORM = {
   estimativaHoras: 8,
   progresso: 0,
   okrId: "",
+  keyResultId: "",
   acaoId: "",
   checklist: [] as ChecklistItem[],
 }
@@ -60,10 +80,58 @@ export default function FormTarefa({
   onSave,
   initialData,
   usuarios = [],
+  empresaId,
 }: FormTarefaProps) {
   const [form, setForm] = useState({ ...DEFAULT_FORM, ...initialData })
   const [newCheckItem, setNewCheckItem] = useState("")
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [okrOptions, setOkrOptions] = useState<OKROption[]>([])
+  const [planoOptions, setPlanoOptions] = useState<PlanoOption[]>([])
+
+  // Carrega OKRs e Planos de Acao da empresa para os selects
+  useEffect(() => {
+    if (!open || !empresaId) return
+    let cancelled = false
+    async function load() {
+      try {
+        const [okrsRaw, planosRaw] = await Promise.all([
+          getOKRsByEmpresa(empresaId!).catch(() => []),
+          getPlanosAcaoByEmpresa(empresaId!).catch(() => []),
+        ])
+        if (cancelled) return
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setOkrOptions((okrsRaw ?? []).map((o: any) => ({
+          id: o.id,
+          objetivo: o.objetivo,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          keyResults: (o.KeyResult ?? []).map((k: any) => ({ id: k.id, descricao: k.descricao })),
+        })))
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setPlanoOptions((planosRaw ?? []).map((p: any) => ({
+          id: p.id,
+          titulo: p.titulo,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          acoes: (p.Acao ?? []).map((a: any) => ({ id: a.id, descricao: a.descricao })),
+        })))
+      } catch {
+        // ignore
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [open, empresaId])
+
+  // Se OKR mudar, limpar keyResultId que nao pertence mais
+  const okrSelecionado = okrOptions.find((o) => o.id === form.okrId)
+  useEffect(() => {
+    if (!form.okrId) return
+    if (form.keyResultId && okrSelecionado) {
+      const krValido = okrSelecionado.keyResults.some((k) => k.id === form.keyResultId)
+      if (!krValido) setForm((p) => ({ ...p, keyResultId: "" }))
+    }
+  }, [form.okrId, form.keyResultId, okrSelecionado])
+
+  const planoSelecionado = planoOptions.find((p) => p.id === getPlanoIdFromAcao(form.acaoId, planoOptions))
 
   function updateField<K extends keyof typeof DEFAULT_FORM>(
     key: K,
@@ -125,6 +193,7 @@ export default function FormTarefa({
       progresso: form.progresso,
       checklist: form.checklist,
       okrId: form.okrId || undefined,
+      keyResultId: form.keyResultId || undefined,
       acaoId: form.acaoId || undefined,
     })
     setForm(DEFAULT_FORM)
@@ -290,28 +359,87 @@ export default function FormTarefa({
             </div>
           </div>
 
-          {/* Vinculos opcionais */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                OKR Relacionado (opcional)
-              </Label>
-              <Input
-                placeholder="ID do OKR..."
-                value={form.okrId}
-                onChange={(e) => updateField("okrId", e.target.value)}
-              />
+          {/* Vinculos de planejamento — OKR / KR / Plano / Acao */}
+          <div className="space-y-3 rounded-lg border border-border bg-background/50 p-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Vincular a planejamento (opcional)
+            </p>
+
+            {/* Linha OKR + Key Result */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <Target size={11} />
+                  Objetivo (OKR)
+                </Label>
+                <Select
+                  value={form.okrId || "none"}
+                  onValueChange={(v) => updateField("okrId", v === "none" ? "" : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um OKR..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum</SelectItem>
+                    {okrOptions.map((o) => (
+                      <SelectItem key={o.id} value={o.id}>{o.objetivo}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <TrendingUp size={11} />
+                  Key Result
+                </Label>
+                <Select
+                  value={form.keyResultId || "none"}
+                  onValueChange={(v) => updateField("keyResultId", v === "none" ? "" : v)}
+                  disabled={!form.okrId || !okrSelecionado || okrSelecionado.keyResults.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={!form.okrId ? "Selecione um OKR antes" : "Selecione um KR..."} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum (vincula ao OKR como um todo)</SelectItem>
+                    {(okrSelecionado?.keyResults ?? []).map((kr) => (
+                      <SelectItem key={kr.id} value={kr.id}>{kr.descricao}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
+            {/* Linha Plano + Acao (alternativo ao OKR direto) */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Acao Relacionada (opcional)
+              <Label className="text-[11px] text-muted-foreground flex items-center gap-1">
+                <ListChecks size={11} />
+                Acao de Plano de Acao (alternativa)
               </Label>
-              <Input
-                placeholder="ID da acao..."
-                value={form.acaoId}
-                onChange={(e) => updateField("acaoId", e.target.value)}
-              />
+              <Select
+                value={form.acaoId || "none"}
+                onValueChange={(v) => updateField("acaoId", v === "none" ? "" : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma acao..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhuma</SelectItem>
+                  {planoOptions.flatMap((p) =>
+                    p.acoes.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {p.titulo} — {a.descricao}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              {planoSelecionado && (
+                <p className="text-[10px] text-muted-foreground">
+                  Plano: <span className="text-foreground">{planoSelecionado.titulo}</span>
+                </p>
+              )}
             </div>
           </div>
 

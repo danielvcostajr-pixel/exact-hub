@@ -62,6 +62,7 @@ export interface Tarefa {
   anexos: Anexo[]
   atividades: LogAtividade[]
   okrId?: string
+  keyResultId?: string
   acaoId?: string
   comentariosCount: number
   anexosCount: number
