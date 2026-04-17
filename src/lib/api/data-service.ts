@@ -60,8 +60,12 @@ export async function getEmpresa(id: string) {
 
 export async function createEmpresa(data: Partial<Empresa>) {
   const supabase = createClient()
+  const nowIso = now()
   const { data: empresa, error } = await supabase
-    .from('Empresa').insert({ id: uuid(), ...data, ativa: true }).select().single()
+    .from('Empresa')
+    .insert({ id: uuid(), ...data, ativa: true, createdAt: nowIso, updatedAt: nowIso })
+    .select()
+    .single()
   if (error) throw error
   return empresa
 }
