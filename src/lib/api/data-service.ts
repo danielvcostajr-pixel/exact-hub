@@ -216,7 +216,7 @@ export async function getTarefasByEmpresa(empresaId: string) {
 export async function createTarefa(params: {
   empresaId: string; titulo: string; descricao?: string; status?: string
   prioridade?: string; prazo?: string; responsavelId?: string; criadoPorId: string
-  okrId?: string
+  okrId?: string; keyResultId?: string
 }) {
   const supabase = createClient()
   const nowIso = now()
@@ -225,7 +225,8 @@ export async function createTarefa(params: {
     descricao: params.descricao ?? null, status: params.status ?? 'BACKLOG',
     prioridade: params.prioridade ?? 'MEDIA', prazo: params.prazo ?? null,
     responsavelId: params.responsavelId ?? null, criadoPorId: params.criadoPorId,
-    okrId: params.okrId ?? null, createdAt: nowIso, updatedAt: nowIso,
+    okrId: params.okrId ?? null, keyResultId: params.keyResultId ?? null,
+    createdAt: nowIso, updatedAt: nowIso,
   }).select().single()
   if (error) throw error
   return data

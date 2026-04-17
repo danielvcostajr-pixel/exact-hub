@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { ChevronDown, ChevronUp, Check, Pencil, Plus, Loader2, CheckCircle, ListTodo } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { ChevronDown, ChevronUp, Check, Pencil, Plus, Loader2, CheckCircle, Target, TrendingUp, GitBranch } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { createTarefa, getCurrentUserId, getTarefasByEmpresa } from '@/lib/api/data-service'
@@ -39,6 +38,17 @@ interface OKRCardProps {
   onUpdateKRValor: (okrId: string, krId: string, novoValor: number) => void
 }
 
+interface TarefaVinculada {
+  id: string
+  titulo: string
+  status: string
+  prioridade: string
+  responsavel?: { nome: string } | null
+  prazo?: string
+  okrId?: string
+  keyResultId?: string | null
+}
+
 function calcProgress(kr: KeyResult): number {
   const range = kr.metaAlvo - kr.metaInicial
   if (range === 0) return 100
@@ -71,16 +81,73 @@ const STATUS_STYLES: Record<OKRStatus, string> = {
   Cancelado: 'bg-red-500/15 text-red-500 border-red-500/30',
 }
 
+const TAREFA_STATUS_COLORS: Record<string, string> = {
+  BACKLOG: 'bg-secondary text-muted-foreground',
+  A_FAZER: 'bg-blue-500/15 text-blue-500',
+  EM_PROGRESSO: 'bg-yellow-500/15 text-yellow-600',
+  REVISAO: 'bg-purple-500/15 text-purple-500',
+  CONCLUIDA: 'bg-green-500/15 text-green-500',
+  CANCELADA: 'bg-red-500/15 text-red-500',
+}
+
+const TAREFA_STATUS_LABELS: Record<string, string> = {
+  BACKLOG: 'Backlog',
+  A_FAZER: 'A Fazer',
+  EM_PROGRESSO: 'Em Progresso',
+  REVISAO: 'Revisao',
+  CONCLUIDA: 'Concluida',
+  CANCELADA: 'Cancelada',
+}
+
+// ── Tarefa row (usada dentro do KR e na lista de soltas) ────────────────────
+function TarefaItem({ t, leaf }: { t: TarefaVinculada; leaf?: boolean }) {
+  return (
+    <div className="flex items-center gap-2 relative">
+      {/* conector em L */}
+      {leaf && (
+        <div className="absolute left-0 top-0 bottom-0 flex items-center pointer-events-none" aria-hidden>
+          <div className="w-4 h-full border-l border-b border-muted-foreground/25 rounded-bl-md -mt-2 h-5" />
+        </div>
+      )}
+      <div className={`flex items-center gap-2 flex-1 min-w-0 rounded-md border border-border/60 bg-background/60 px-2.5 py-1.5 ${leaf ? 'ml-4' : ''}`}>
+        {t.status === 'CONCLUIDA' ? (
+          <CheckCircle size={12} className="text-green-500 shrink-0" />
+        ) : (
+          <div className="w-3 h-3 rounded-full border-2 border-muted-foreground/40 shrink-0" />
+        )}
+        <span className={`text-xs truncate flex-1 ${t.status === 'CONCLUIDA' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+          {t.titulo}
+        </span>
+        {t.responsavel?.nome && (
+          <span className="text-[10px] text-muted-foreground shrink-0">
+            {t.responsavel.nome.split(' ')[0]}
+          </span>
+        )}
+        <Badge className={`text-[9px] h-4 px-1.5 border-0 shrink-0 ${TAREFA_STATUS_COLORS[t.status] ?? TAREFA_STATUS_COLORS.BACKLOG}`}>
+          {TAREFA_STATUS_LABELS[t.status] ?? t.status}
+        </Badge>
+      </div>
+    </div>
+  )
+}
+
+// ── Linha de KR (agora recebe suas próprias tarefas) ────────────────────────
 function KRRow({
   kr,
   okrId,
   empresaId,
+  tarefas,
+  index,
   onUpdate,
+  onTarefaCriada,
 }: {
   kr: KeyResult
   okrId: string
   empresaId: string
+  tarefas: TarefaVinculada[]
+  index: number
   onUpdate: (newVal: number) => void
+  onTarefaCriada: () => void
 }) {
   const [editing, setEditing] = useState(false)
   const [tempVal, setTempVal] = useState(String(kr.valorAtual))
@@ -90,7 +157,6 @@ function KRRow({
   const [showTarefaInput, setShowTarefaInput] = useState(false)
   const [tarefaTitulo, setTarefaTitulo] = useState('')
   const [savingTarefa, setSavingTarefa] = useState(false)
-  const [tarefaCriada, setTarefaCriada] = useState(false)
 
   function handleSave() {
     const val = parseFloat(tempVal)
@@ -107,14 +173,12 @@ function KRRow({
         empresaId,
         titulo: tarefaTitulo.trim(),
         okrId,
+        keyResultId: kr.id, // vincula direto ao KR
         criadoPorId: userId || 'system',
       })
-      setTarefaCriada(true)
       setTarefaTitulo('')
-      setTimeout(() => {
-        setTarefaCriada(false)
-        setShowTarefaInput(false)
-      }, 2000)
+      setShowTarefaInput(false)
+      onTarefaCriada()
     } catch (err) {
       console.error('Erro ao criar tarefa:', err)
     } finally {
@@ -123,155 +187,178 @@ function KRRow({
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-border bg-background p-3">
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-sm text-foreground leading-snug flex-1">{kr.descricao}</p>
-        <span className={`text-xs font-semibold tabular-nums ${getProgressColor(pct)}`}>
-          {Math.round(pct)}%
-        </span>
+    <div className="relative">
+      {/* Linha vertical de conexao do OKR aos KRs */}
+      <div
+        className="absolute left-3 top-0 w-px bg-primary/30"
+        style={{ height: 'calc(100% + 0.5rem)' }}
+        aria-hidden
+      />
+      {/* Dot numerado no inicio do KR */}
+      <div className="absolute left-1 top-4 w-4 h-4 rounded-full bg-primary text-white text-[9px] font-bold flex items-center justify-center ring-4 ring-background z-10">
+        {index + 1}
       </div>
 
-      {/* Progress bar */}
-      <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-secondary">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${getProgressBarColor(pct)}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-
-      {/* Value display + inline edit */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs text-muted-foreground">
-          Inicial: {kr.metaInicial} {kr.unidade}
-        </span>
-        <span className="text-xs text-muted-foreground">•</span>
-        <span className="text-xs text-muted-foreground">
-          Alvo: {kr.metaAlvo} {kr.unidade}
-        </span>
-        <span className="text-xs text-muted-foreground">•</span>
-        {editing ? (
-          <div className="flex items-center gap-1">
-            <Input
-              type="number"
-              value={tempVal}
-              onChange={(e) => setTempVal(e.target.value)}
-              className="h-6 w-20 text-xs bg-card border-border text-foreground px-2"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSave()
-                if (e.key === 'Escape') setEditing(false)
-              }}
-              autoFocus
-            />
-            <span className="text-xs text-muted-foreground">{kr.unidade}</span>
-            <Button
-              size="sm"
-              onClick={handleSave}
-              className="h-6 w-6 p-0 bg-primary hover:bg-primary/90 text-white"
-            >
-              <Check size={11} />
-            </Button>
-          </div>
-        ) : (
-          <button
-            onClick={() => { setTempVal(String(kr.valorAtual)); setEditing(true) }}
-            className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
-          >
-            <span className="font-medium">
-              Atual: {kr.valorAtual} {kr.unidade}
-            </span>
-            <Pencil size={10} />
-          </button>
-        )}
-        <span className="text-xs text-muted-foreground ml-auto">
-          {kr.responsavelNome.split(' ')[0]}
-        </span>
-      </div>
-
-      {/* + Tarefa button and inline input */}
-      <div className="flex items-center gap-2">
-        {tarefaCriada ? (
-          <span className="flex items-center gap-1 text-xs text-green-500 font-medium">
-            <CheckCircle size={12} />
-            Tarefa criada!
+      <div className="ml-8 flex flex-col gap-2 rounded-lg border border-border bg-background p-3 shadow-sm">
+        {/* header do KR */}
+        <div className="flex items-start gap-2">
+          <TrendingUp size={14} className="text-primary shrink-0 mt-0.5" />
+          <p className="text-sm font-medium text-foreground leading-snug flex-1">{kr.descricao}</p>
+          <span className={`text-sm font-bold tabular-nums ${getProgressColor(pct)}`}>
+            {Math.round(pct)}%
           </span>
-        ) : showTarefaInput ? (
-          <div className="flex items-center gap-1 flex-1">
-            <Input
-              type="text"
-              placeholder="Titulo da tarefa..."
-              value={tarefaTitulo}
-              onChange={(e) => setTarefaTitulo(e.target.value)}
-              className="h-6 text-xs bg-card border-border text-foreground px-2 flex-1"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCreateTarefa()
-                if (e.key === 'Escape') { setShowTarefaInput(false); setTarefaTitulo('') }
-              }}
-              autoFocus
-              disabled={savingTarefa}
-            />
-            <Button
-              size="sm"
-              onClick={handleCreateTarefa}
-              disabled={savingTarefa || !tarefaTitulo.trim()}
-              className="h-6 px-2 text-xs bg-primary hover:bg-primary/90 text-white gap-1"
+        </div>
+
+        {/* Progress bar */}
+        <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${getProgressBarColor(pct)}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+
+        {/* metadados */}
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          <span className="text-muted-foreground">
+            {kr.metaInicial} <span className="mx-1">→</span>
+          </span>
+          {editing ? (
+            <div className="flex items-center gap-1">
+              <Input
+                type="number"
+                value={tempVal}
+                onChange={(e) => setTempVal(e.target.value)}
+                className="h-6 w-20 text-xs bg-card border-border text-foreground px-2"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSave()
+                  if (e.key === 'Escape') setEditing(false)
+                }}
+                autoFocus
+              />
+              <Button size="sm" onClick={handleSave} className="h-6 w-6 p-0 bg-primary hover:bg-primary/90 text-white">
+                <Check size={11} />
+              </Button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setTempVal(String(kr.valorAtual)); setEditing(true) }}
+              className="flex items-center gap-1 text-primary hover:text-primary/80 transition-colors font-medium"
             >
-              {savingTarefa ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => { setShowTarefaInput(false); setTarefaTitulo('') }}
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-            >
-              &times;
-            </Button>
+              {kr.valorAtual} {kr.unidade}
+              <Pencil size={9} />
+            </button>
+          )}
+          <span className="text-muted-foreground">
+            <span className="mx-1">→</span> {kr.metaAlvo} {kr.unidade}
+          </span>
+          {kr.responsavelNome && (
+            <span className="text-muted-foreground ml-auto">
+              {kr.responsavelNome.split(' ')[0]}
+            </span>
+          )}
+        </div>
+
+        {/* Tarefas vinculadas a este KR + botao de adicionar */}
+        {(tarefas.length > 0 || showTarefaInput) && (
+          <div className="mt-1 pt-2 border-t border-border/50 flex flex-col gap-1">
+            {tarefas.length > 0 && (
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">
+                Acoes para atingir este KR
+              </p>
+            )}
+            {tarefas.map((t) => (
+              <TarefaItem key={t.id} t={t} leaf />
+            ))}
           </div>
-        ) : (
-          <button
-            onClick={() => setShowTarefaInput(true)}
-            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors"
-          >
-            <Plus size={11} />
-            Tarefa
-          </button>
         )}
+
+        {/* Input de nova tarefa OU botao */}
+        <div className="flex items-center gap-2">
+          {showTarefaInput ? (
+            <div className="flex items-center gap-1 flex-1">
+              <Input
+                type="text"
+                placeholder={`Acao para atingir este KR...`}
+                value={tarefaTitulo}
+                onChange={(e) => setTarefaTitulo(e.target.value)}
+                className="h-7 text-xs bg-card border-border text-foreground px-2 flex-1"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreateTarefa()
+                  if (e.key === 'Escape') { setShowTarefaInput(false); setTarefaTitulo('') }
+                }}
+                autoFocus
+                disabled={savingTarefa}
+              />
+              <Button
+                size="sm"
+                onClick={handleCreateTarefa}
+                disabled={savingTarefa || !tarefaTitulo.trim()}
+                className="h-7 px-2 text-xs bg-primary hover:bg-primary/90 text-white gap-1"
+              >
+                {savingTarefa ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => { setShowTarefaInput(false); setTarefaTitulo('') }}
+                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+              >
+                &times;
+              </Button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowTarefaInput(true)}
+              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors"
+            >
+              <Plus size={11} />
+              Adicionar acao
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
 }
 
-interface TarefaVinculada {
-  id: string
-  titulo: string
-  status: string
-  prioridade: string
-  responsavel?: { nome: string } | null
-  prazo?: string
-}
-
+// ── Card principal do OKR ───────────────────────────────────────────────────
 export function OKRCard({ okr, empresaId, onUpdateKRValor }: OKRCardProps) {
   const [expanded, setExpanded] = useState(false)
   const overall = calcOverallProgress(okr)
-  const [tarefasVinculadas, setTarefasVinculadas] = useState<TarefaVinculada[]>([])
+  const [todasTarefas, setTodasTarefas] = useState<TarefaVinculada[]>([])
 
-  // Load tarefas linked to this OKR
+  const loadTarefas = useCallback(async () => {
+    if (!empresaId) return
+    try {
+      const data = await getTarefasByEmpresa(empresaId)
+      if (data) {
+        const linked = (data as unknown as TarefaVinculada[]).filter(
+          (t) => (t as unknown as { okrId?: string }).okrId === okr.id
+        )
+        setTodasTarefas(linked)
+      }
+    } catch { /* ignore */ }
+  }, [empresaId, okr.id])
+
   useEffect(() => {
-    if (!expanded || !empresaId) return
-    async function loadTarefas() {
-      try {
-        const data = await getTarefasByEmpresa(empresaId)
-        if (data) {
-          const linked = (data as unknown as TarefaVinculada[]).filter((t) => (t as unknown as { okrId?: string }).okrId === okr.id)
-          setTarefasVinculadas(linked)
-        }
-      } catch { /* ignore */ }
+    if (expanded) loadTarefas()
+  }, [expanded, loadTarefas])
+
+  // Agrupar tarefas por keyResultId (sem KR fica num bucket separado)
+  const tarefasPorKR: Record<string, TarefaVinculada[]> = {}
+  const tarefasSemKR: TarefaVinculada[] = []
+  for (const t of todasTarefas) {
+    if (t.keyResultId) {
+      if (!tarefasPorKR[t.keyResultId]) tarefasPorKR[t.keyResultId] = []
+      tarefasPorKR[t.keyResultId].push(t)
+    } else {
+      tarefasSemKR.push(t)
     }
-    loadTarefas()
-  }, [expanded, empresaId, okr.id])
+  }
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden transition-shadow hover:shadow-md">
-      {/* Card header — always visible */}
+      {/* ─── Header: OBJETIVO ─────────────────────────────────────── */}
       <button
         onClick={() => setExpanded((p) => !p)}
         className="w-full text-left flex flex-col gap-3 p-5 focus:outline-none"
@@ -279,17 +366,28 @@ export function OKRCard({ okr, empresaId, onUpdateKRValor }: OKRCardProps) {
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="flex flex-col gap-1 flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
+                <Target size={11} />
+                Objetivo
+              </div>
               <Badge
                 variant="outline"
                 className={`text-[11px] border px-2 py-0 ${STATUS_STYLES[okr.status]}`}
               >
                 {okr.status}
               </Badge>
-              <span className="text-[11px] text-muted-foreground">
-                {okr.keyResults.length} Key Result{okr.keyResults.length !== 1 ? 's' : ''}
+              <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                <GitBranch size={10} />
+                {okr.keyResults.length} KR{okr.keyResults.length !== 1 ? 's' : ''}
+                {todasTarefas.length > 0 && (
+                  <>
+                    <span className="mx-1">·</span>
+                    {todasTarefas.length} açõe{todasTarefas.length !== 1 ? 's' : ''}
+                  </>
+                )}
               </span>
             </div>
-            <h3 className="text-base font-semibold text-foreground leading-snug truncate">
+            <h3 className="text-base font-semibold text-foreground leading-snug">
               {okr.objetivo}
             </h3>
             {okr.descricao && (
@@ -328,66 +426,41 @@ export function OKRCard({ okr, empresaId, onUpdateKRValor }: OKRCardProps) {
         </div>
       </button>
 
-      {/* Expanded KRs + Tarefas */}
+      {/* ─── Cascateamento: KRs + Acoes ─────────────────────────── */}
       {expanded && (
-        <div className="px-5 pb-5 flex flex-col gap-2 border-t border-border pt-4">
-          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-            Key Results
-          </h4>
-          {okr.keyResults.map((kr) => (
-            <KRRow
-              key={kr.id}
-              kr={kr}
-              okrId={okr.id}
-              empresaId={empresaId}
-              onUpdate={(val) => onUpdateKRValor(okr.id, kr.id, val)}
-            />
-          ))}
+        <div className="px-5 pb-5 border-t border-border pt-4 flex flex-col gap-4 bg-secondary/20">
+          {okr.keyResults.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic">
+              Nenhum Key Result definido. Edite o OKR para adicionar resultados-chave.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {okr.keyResults.map((kr, idx) => (
+                <KRRow
+                  key={kr.id}
+                  kr={kr}
+                  okrId={okr.id}
+                  empresaId={empresaId}
+                  tarefas={tarefasPorKR[kr.id] ?? []}
+                  index={idx}
+                  onUpdate={(val) => onUpdateKRValor(okr.id, kr.id, val)}
+                  onTarefaCriada={loadTarefas}
+                />
+              ))}
+            </div>
+          )}
 
-          {/* Tarefas vinculadas a este OKR */}
-          {tarefasVinculadas.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-border">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                <ListTodo size={12} />
-                Tarefas Vinculadas ({tarefasVinculadas.length})
-              </h4>
-              <div className="flex flex-col gap-1.5">
-                {tarefasVinculadas.map((t) => {
-                  const statusColors: Record<string, string> = {
-                    BACKLOG: 'bg-secondary text-muted-foreground',
-                    A_FAZER: 'bg-blue-500/15 text-blue-500',
-                    EM_PROGRESSO: 'bg-yellow-500/15 text-yellow-600',
-                    REVISAO: 'bg-purple-500/15 text-purple-500',
-                    CONCLUIDA: 'bg-green-500/15 text-green-500',
-                    CANCELADA: 'bg-red-500/15 text-red-500',
-                  }
-                  const statusLabels: Record<string, string> = {
-                    BACKLOG: 'Backlog', A_FAZER: 'A Fazer', EM_PROGRESSO: 'Em Progresso',
-                    REVISAO: 'Revisao', CONCLUIDA: 'Concluida', CANCELADA: 'Cancelada',
-                  }
-                  return (
-                    <div key={t.id} className="flex items-center justify-between gap-2 rounded-md border border-border bg-background px-3 py-2">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        {t.status === 'CONCLUIDA' ? (
-                          <CheckCircle size={14} className="text-green-500 shrink-0" />
-                        ) : (
-                          <div className="w-3.5 h-3.5 rounded-full border-2 border-muted-foreground/30 shrink-0" />
-                        )}
-                        <span className={`text-sm truncate ${t.status === 'CONCLUIDA' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-                          {t.titulo}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {t.responsavel?.nome && (
-                          <span className="text-[10px] text-muted-foreground">{t.responsavel.nome.split(' ')[0]}</span>
-                        )}
-                        <Badge className={`text-[9px] h-4 px-1.5 border-0 ${statusColors[t.status] ?? statusColors.BACKLOG}`}>
-                          {statusLabels[t.status] ?? t.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  )
-                })}
+          {/* Acoes vinculadas ao OKR mas sem KR especifico */}
+          {tarefasSemKR.length > 0 && (
+            <div className="rounded-lg border border-dashed border-border bg-background/40 p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1">
+                <GitBranch size={10} />
+                Acoes gerais do OKR (sem KR especifico)
+              </p>
+              <div className="flex flex-col gap-1">
+                {tarefasSemKR.map((t) => (
+                  <TarefaItem key={t.id} t={t} />
+                ))}
               </div>
             </div>
           )}
