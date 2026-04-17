@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, ClipboardList, MessageSquare, BarChart3, Eye, Send, CheckCircle, FileText, ArrowLeft, UserPlus, X, Loader2 } from 'lucide-react'
+import { Plus, ClipboardList, MessageSquare, BarChart3, Eye, Send, CheckCircle, FileText, ArrowLeft, UserPlus, X, Loader2, Sparkles } from 'lucide-react'
 import { useClienteContext } from '@/hooks/useClienteContext'
 import { getEntrevistasByEmpresa, getRespostasByEntrevista, createResposta } from '@/lib/api/data-service'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { FormQuestionario } from '@/components/entrevistas/FormQuestionario'
 import { RespostaCard } from '@/components/entrevistas/RespostaCard'
 import { AnalisePareto } from '@/components/entrevistas/AnalisePareto'
+import { UploadTranscricoes } from '@/components/entrevistas/UploadTranscricoes'
 import { Entrevista, RespostaEntrevista, StatusEntrevista, Pergunta } from '@/types'
 
 const STATUS_CONFIG: Record<StatusEntrevista, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
@@ -349,19 +350,34 @@ export default function EntrevistasPage() {
             <span className="text-sm text-primary font-medium">{clienteAtivo.nome}</span>
           )}
         </div>
-        <div className="flex flex-col items-center justify-center py-16 gap-4">
+        <div className="flex flex-col items-center justify-center py-10 gap-4">
           <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
             <ClipboardList size={24} className="text-muted-foreground" />
           </div>
           <div className="text-center">
             <h3 className="text-lg font-semibold text-foreground mb-1">Nenhuma entrevista realizada</h3>
-            <p className="text-sm text-muted-foreground max-w-md">Crie a primeira entrevista para este cliente.</p>
+            <p className="text-sm text-muted-foreground max-w-md">Crie um questionário pela plataforma ou envie transcrições existentes (PDF/DOCX) para análise com IA.</p>
           </div>
-          <Button onClick={() => setFormOpen(true)} className="gradient-exact text-white mt-2">
-            <Plus size={16} />
-            Criar Primeira Entrevista
-          </Button>
+          <div className="flex gap-2 flex-wrap justify-center">
+            <Button onClick={() => setFormOpen(true)} className="gradient-exact text-white">
+              <Plus size={16} />
+              Criar Questionário
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setActiveTab('transcricoes')}
+              className="border-primary/40 text-primary hover:bg-primary/10"
+            >
+              <Sparkles size={16} />
+              Analisar Transcrições
+            </Button>
+          </div>
         </div>
+        {activeTab === 'transcricoes' && (
+          <div className="mt-4">
+            <UploadTranscricoes nomeEmpresa={clienteAtivo?.nome} />
+          </div>
+        )}
         <FormQuestionario
           open={formOpen}
           onClose={() => setFormOpen(false)}
@@ -425,6 +441,13 @@ export default function EntrevistasPage() {
           >
             <BarChart3 size={13} />
             Analise
+          </TabsTrigger>
+          <TabsTrigger
+            value="transcricoes"
+            className="data-[state=active]:bg-primary data-[state=active]:text-white text-muted-foreground gap-1.5"
+          >
+            <Sparkles size={13} />
+            Transcrições
           </TabsTrigger>
         </TabsList>
 
@@ -594,6 +617,11 @@ export default function EntrevistasPage() {
               )}
             </div>
           )}
+        </TabsContent>
+
+        {/* Tab: Transcrições */}
+        <TabsContent value="transcricoes" className="mt-4">
+          <UploadTranscricoes nomeEmpresa={clienteAtivo?.nome} />
         </TabsContent>
 
       </Tabs>
